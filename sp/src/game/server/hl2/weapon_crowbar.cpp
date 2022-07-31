@@ -18,6 +18,7 @@
 #include "npcevent.h"
 #include "ai_basenpc.h"
 #include "weapon_crowbar.h"
+#include "gamestats.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -31,6 +32,12 @@ ConVar    sk_npc_dmg_crowbar		( "sk_npc_dmg_crowbar","0");
 
 IMPLEMENT_SERVERCLASS_ST(CWeaponCrowbar, DT_WeaponCrowbar)
 END_SEND_TABLE()
+
+#define BLUDGEON_HULL_DIM		16
+
+static const Vector g_bludgeonMins(-BLUDGEON_HULL_DIM, -BLUDGEON_HULL_DIM, -BLUDGEON_HULL_DIM);
+static const Vector g_bludgeonMaxs(BLUDGEON_HULL_DIM, BLUDGEON_HULL_DIM, BLUDGEON_HULL_DIM);
+
 
 #ifndef HL2MP
 LINK_ENTITY_TO_CLASS( weapon_crowbar, CWeaponCrowbar );
@@ -223,4 +230,158 @@ void CWeaponCrowbar::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatC
 		BaseClass::Operator_HandleAnimEvent( pEvent, pOperator );
 		break;
 	}
+}
+
+void CWeaponCrowbar::PrimaryAttack()
+{
+	if(m_iCrowbarStage == 0)
+		Swing(false);
+}
+
+void CWeaponCrowbar::SecondaryAttack()
+{
+	// amogus
+}
+
+void CWeaponCrowbar::ItemPostFrame()
+{
+	BaseClass::ItemPostFrame(); // call the original
+
+	CBasePlayer* pPlayer = ToBasePlayer(GetOwner());
+
+	if (pPlayer == NULL)
+		return;
+
+	// player pressed the button, start charging...
+	if ((pPlayer->m_nButtons & IN_ATTACK2) && m_iCrowbarStage == 0 && m_flStageUpdate < gpGlobals->curtime)
+	{
+		m_iCrowbarStage = 1;
+		SendWeaponAnim(ACT_VM_HITCENTER);
+		m_flStageUpdate = gpGlobals->curtime + SequenceDuration();
+	}
+
+	// player released the button, what to do now?
+	if (!(pPlayer->m_nButtons & IN_ATTACK2) && m_iCrowbarStage == 1 && m_flStageUpdate < gpGlobals->curtime)
+	{
+		m_iCrowbarStage = 0;
+		Swing(true);
+		m_flNextPrimaryAttack = m_flNextSecondaryAttack = gpGlobals->curtime + 0.5f;
+	}
+
+}
+
+void CWeaponCrowbar::Swing(int bIsSecondary)
+{
+	trace_t traceHit;
+
+	// Try a ray
+	CBasePlayer* pOwner = ToBasePlayer(GetOwner());
+	if (!pOwner)
+		return;
+
+	pOwner->RumbleEffect(RUMBLE_CROWBAR_SWING, 0, RUMBLE_FLAG_RESTART);
+
+	Vector swingStart = pOwner->Weapon_ShootPosition();
+	Vector forward;
+
+	forward = pOwner->GetAutoaimVector(AUTOAIM_SCALE_DEFAULT, GetRange());
+
+	Vector swingEnd = swingStart + forward * GetRange();
+	UTIL_TraceLine(swingStart, swingEnd, MASK_SHOT_HULL, pOwner, COLLISION_GROUP_NONE, &traceHit);
+	Activity nHitActivity = ACT_VM_HITCENTER;
+
+	// Like bullets, bludgeon traces have to trace against triggers.
+	CTakeDamageInfo triggerInfo(GetOwner(), GetOwner(), GetDamageForActivity(nHitActivity) * bIsSecondary ? 1 : 5, DMG_CLUB);
+
+	triggerInfo.SetDamagePosition(traceHit.startpos);
+	triggerInfo.SetDamageForce(forward);
+	TraceAttackToTriggers(triggerInfo, traceHit.startpos, traceHit.endpos, forward);
+
+	if (traceHit.fraction == 1.0)
+	{
+		float bludgeonHullRadius = 1.732f * BLUDGEON_HULL_DIM;  // hull is +/- 16, so use cuberoot of 2 to determine how big the hull is from center to the corner point
+
+		// Back off by hull "radius"
+		swingEnd -= forward * bludgeonHullRadius;
+
+		UTIL_TraceHull(swingStart, swingEnd, g_bludgeonMins, g_bludgeonMaxs, MASK_SHOT_HULL, pOwner, COLLISION_GROUP_NONE, &traceHit);
+		if (traceHit.fraction < 1.0 && traceHit.m_pEnt)
+		{
+			Vector vecToTarget = traceHit.m_pEnt->GetAbsOrigin() - swingStart;
+			VectorNormalize(vecToTarget);
+
+			float dot = vecToTarget.Dot(forward);
+
+			// YWB:  Make sure they are sort of facing the guy at least...
+			if (dot < 0.70721f)
+			{
+				// Force amiss
+				traceHit.fraction = 1.0f;
+			}
+			else
+			{
+				nHitActivity = ChooseIntersectionPointAndActivity(traceHit, g_bludgeonMins, g_bludgeonMaxs, pOwner);
+			}
+		}
+	}
+
+	if (!bIsSecondary)
+	{
+		m_iPrimaryAttacks++;
+	}
+	else
+	{
+		m_iSecondaryAttacks++;
+	}
+
+	gamestats->Event_WeaponFired(pOwner, !bIsSecondary, GetClassname());
+
+	// -------------------------
+	//	Miss
+	// -------------------------
+	if (traceHit.fraction == 1.0f)
+	{
+		nHitActivity = bIsSecondary ? ACT_VM_MISSCENTER : ACT_VM_MISSCENTER;
+
+		// We want to test the first swing again
+		Vector testEnd = swingStart + forward * GetRange();
+
+#ifdef MAPBASE
+		// Sound has been moved here since we're using the other melee sounds now
+		WeaponSound(SINGLE);
+#endif
+
+		// See if we happened to hit water
+		ImpactWater(swingStart, testEnd);
+	}
+	else
+	{
+#ifdef MAPBASE
+		// Other melee sounds
+		if (traceHit.m_pEnt && traceHit.m_pEnt->IsWorld())
+			WeaponSound(MELEE_HIT_WORLD);
+		else if (traceHit.m_pEnt && !traceHit.m_pEnt->PassesDamageFilter(triggerInfo))
+			WeaponSound(MELEE_MISS);
+		else
+			WeaponSound(MELEE_HIT);
+#endif
+
+		Hit(traceHit, nHitActivity, bIsSecondary ? true : false);
+	}
+
+	// Send the anim
+	SendWeaponAnim(nHitActivity);
+
+	//Setup our next attack times
+	m_flNextPrimaryAttack = gpGlobals->curtime + GetFireRate();
+	m_flNextSecondaryAttack = gpGlobals->curtime + SequenceDuration();
+
+#ifndef MAPBASE
+	//Play swing sound
+	WeaponSound(SINGLE);
+#endif
+
+#ifdef MAPBASE
+	pOwner->SetAnimation(PLAYER_ATTACK1);
+#endif
 }

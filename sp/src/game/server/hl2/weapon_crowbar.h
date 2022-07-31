@@ -8,6 +8,7 @@
 #define WEAPON_CROWBAR_H
 
 #include "basebludgeonweapon.h"
+#include "rumble_shared.h"
 
 #if defined( _WIN32 )
 #pragma once
@@ -41,10 +42,17 @@ public:
 	float		GetDamageForActivity( Activity hitActivity );
 
 	virtual int WeaponMeleeAttack1Condition( float flDot, float flDist );
-	void		SecondaryAttack( void )	{	return;	}
+	void		SecondaryAttack(void);
+	void		PrimaryAttack(void);
+	void		ItemPostFrame(void);
+	void		Swing(int bIsSecondary);
 
 	// Animation event
 	virtual void Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
+
+	int			m_iCrowbarStage;
+	float		m_flStageUpdate;
+	bool		m_bIsHoldingSecondary;
 
 #ifdef MAPBASE
 	// Don't use backup activities
