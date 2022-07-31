@@ -392,11 +392,18 @@ CHud::CHud()
 	m_flScreenShotTime = -1;
 }
 
+// declare the user message handler
+void __MsgFunc_MyHandler(bf_read& msg)
+{
+	gHUD.isFlashlightOn = (bool)msg.ReadShort();
+}
+
 //-----------------------------------------------------------------------------
 // Purpose: This is called every time the DLL is loaded
 //-----------------------------------------------------------------------------
 void CHud::Init( void )
 {
+	usermessages->HookMessage("NightVision", __MsgFunc_MyHandler);
 	HOOK_HUD_MESSAGE( gHUD, ResetHUD );
 	
 #ifdef CSTRIKE_DLL

@@ -163,4 +163,7 @@ void ResetToneMapping(float value);
 
 void UpdateFullScreenDepthTexture( void );
 
+void ScreenOver_f(void);
+
 #endif // VIEW_SCENE_H
+

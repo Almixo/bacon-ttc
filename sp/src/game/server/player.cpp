@@ -7249,6 +7249,11 @@ void CBasePlayer::UpdateClientData( void )
 		world->SetDisplayTitle( false );
 	}
 
+	UserMessageBegin(user, "NightVision");
+	WRITE_SHORT(FlashlightIsOn());
+	MessageEnd();
+	
+
 	if (m_ArmorValue != m_iClientBattery)
 	{
 		m_iClientBattery = m_ArmorValue;

@@ -161,6 +161,8 @@ public:
 
 	void						SetScreenShotTime( float flTime ){ m_flScreenShotTime = flTime; }
 
+	bool						isFlashlightOn;
+
 public:
 
 	int							m_iKeyBits;

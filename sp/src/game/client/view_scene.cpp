@@ -13,6 +13,7 @@
 #include "viewrender.h"
 #include "sourcevr/isourcevirtualreality.h"
 #include "client_virtualreality.h"
+#include "usermessages.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -153,3 +154,26 @@ void UpdateFullScreenDepthTexture( void )
 		pMaterial->DecrementReferenceCount();
 	}
 }
+
+// NightVision - bacontsu
+// based on nightfall's NV tutorial by amckern - amckern@yahoo.com 
+void ScreenOver_f(void)
+{
+	//This is the texture we are going to use for the 'effect' - never use an ext on material files
+	IMaterial* pMaterial = materials->FindMaterial("HUDoverlays/nightvision", TEXTURE_GROUP_OTHER, true);
+
+	if (gHUD.isFlashlightOn)
+	{
+		// turn it on
+		view->SetScreenOverlayMaterial(pMaterial);
+	}
+	else
+	{
+		// turn it off
+		view->SetScreenOverlayMaterial(NULL);
+	}
+
+}
+
+
+

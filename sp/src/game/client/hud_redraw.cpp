@@ -15,6 +15,7 @@
 #include "vgui_basepanel.h"
 #include "hud_crosshair.h"
 #include <vgui/ISurface.h>
+#include "view_scene.h"
 
 #if defined( REPLAY_ENABLED )
 #include "replay/ienginereplay.h"
@@ -99,6 +100,8 @@ void CHud::Think(void)
 
 		m_flScreenShotTime = -1;
 	}
+
+	ScreenOver_f();
 }
 
 //-----------------------------------------------------------------------------
