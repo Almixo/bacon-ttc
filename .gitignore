@@ -91,3 +91,23 @@ sp/src/vgui2/*.pdb
 
 # Build support files
 sp/src/devtools/gcc9+support.o
+sp/src/lib/public/mathlib.lib
+sp/src/lib/public/mathlib.pdb
+sp/src/lib/public/raytrace.lib
+sp/src/lib/public/raytrace.pdb
+sp/src/lib/public/responserules.pdb
+sp/src/lib/public/tier1.lib
+sp/src/lib/public/tier1.pdb
+sp/src/lib/public/vgui_controls.lib
+sp/src/lib/public/vgui_controls.pdb
+sp/src/lib/public/vscript.pdb
+sp/src/responserules/runtime/Debug/responserules.lib.recipe
+sp/src/responserules/runtime/Debug/responserules.pdb
+sp/src/vgui2/vgui_controls/Debug/vgui_controls.lib.recipe
+sp/src/vgui2/vgui_controls/Debug/vgui_controls.pdb
+sp/src/vpc_scripts/newer_vs_toolsets.vpc
+sp/src/lib/public/mathlib.lib
+sp/src/lib/public/raytrace.lib
+sp/src/lib/public/tier1.lib
+sp/src/lib/public/vgui_controls.lib
+sp/src/vpc_scripts/newer_vs_toolsets.vpc
