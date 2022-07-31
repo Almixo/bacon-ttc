@@ -46,6 +46,7 @@ public:
 	void		PrimaryAttack(void);
 	void		ItemPostFrame(void);
 	void		Swing(int bIsSecondary);
+	void		Hit(trace_t& traceHit, Activity nHitActivity, bool bIsSecondary);
 
 	// Animation event
 	virtual void Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
@@ -53,6 +54,8 @@ public:
 	int			m_iCrowbarStage;
 	float		m_flStageUpdate;
 	bool		m_bIsHoldingSecondary;
+	float		m_flHoldUpdate;
+	float		m_flHoldMultiplier;
 
 #ifdef MAPBASE
 	// Don't use backup activities

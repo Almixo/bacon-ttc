@@ -256,8 +256,19 @@ void CWeaponCrowbar::ItemPostFrame()
 	if ((pPlayer->m_nButtons & IN_ATTACK2) && m_iCrowbarStage == 0 && m_flStageUpdate < gpGlobals->curtime)
 	{
 		m_iCrowbarStage = 1;
+		m_flHoldMultiplier = 1.0f;
 		SendWeaponAnim(ACT_VM_HITCENTER);
 		m_flStageUpdate = gpGlobals->curtime + SequenceDuration();
+	}
+
+	// start calculating how long its being held
+	if (m_iCrowbarStage == 1 && m_flHoldUpdate < gpGlobals->curtime)
+	{
+		if (m_flHoldMultiplier < 2.0f)
+			m_flHoldMultiplier += 0.03125f;
+
+		m_flHoldUpdate = gpGlobals->curtime + 0.1f;
+		//Msg("holding the wrench!, multiplier: %f\n", m_flHoldMultiplier);
 	}
 
 	// player released the button, what to do now?
@@ -291,7 +302,7 @@ void CWeaponCrowbar::Swing(int bIsSecondary)
 	Activity nHitActivity = ACT_VM_HITCENTER;
 
 	// Like bullets, bludgeon traces have to trace against triggers.
-	CTakeDamageInfo triggerInfo(GetOwner(), GetOwner(), GetDamageForActivity(nHitActivity) * bIsSecondary ? 1 : 5, DMG_CLUB);
+	CTakeDamageInfo triggerInfo(GetOwner(), GetOwner(), GetDamageForActivity(nHitActivity), DMG_CLUB);
 
 	triggerInfo.SetDamagePosition(traceHit.startpos);
 	triggerInfo.SetDamageForce(forward);
@@ -384,4 +395,61 @@ void CWeaponCrowbar::Swing(int bIsSecondary)
 #ifdef MAPBASE
 	pOwner->SetAnimation(PLAYER_ATTACK1);
 #endif
+}
+
+//------------------------------------------------------------------------------
+// Purpose: Implement impact function
+//------------------------------------------------------------------------------
+void CWeaponCrowbar::Hit(trace_t& traceHit, Activity nHitActivity, bool bIsSecondary)
+{
+	CBasePlayer* pPlayer = ToBasePlayer(GetOwner());
+
+	//Do view kick
+	AddViewKick();
+
+	//Make sound for the AI
+	CSoundEnt::InsertSound(SOUND_BULLET_IMPACT, traceHit.endpos, 400, 0.2f, pPlayer);
+
+	// This isn't great, but it's something for when the crowbar hits.
+	pPlayer->RumbleEffect(RUMBLE_AR2, 0, RUMBLE_FLAG_RESTART);
+
+	CBaseEntity* pHitEntity = traceHit.m_pEnt;
+
+	//Apply damage to a hit target
+	if (pHitEntity != NULL)
+	{
+		Vector hitDirection;
+		pPlayer->EyeVectors(&hitDirection, NULL, NULL);
+		VectorNormalize(hitDirection);
+
+		CTakeDamageInfo info(GetOwner(), GetOwner(), GetDamageForActivity(nHitActivity), DMG_CLUB);
+
+		// multiply damage by two times if charging - WIP
+		if (bIsSecondary)
+		{
+			info.SetDamage(info.GetDamage() * m_flHoldMultiplier);
+		}
+
+		if (pPlayer && pHitEntity->IsNPC())
+		{
+			// If bonking an NPC, adjust damage.
+			info.AdjustPlayerDamageInflictedForSkillLevel();
+		}
+
+		CalculateMeleeDamageForce(&info, hitDirection, traceHit.endpos);
+
+		pHitEntity->DispatchTraceAttack(info, hitDirection, &traceHit);
+		ApplyMultiDamage();
+
+		// Now hit all triggers along the ray that... 
+		TraceAttackToTriggers(info, traceHit.startpos, traceHit.endpos, hitDirection);
+
+		if (ToBaseCombatCharacter(pHitEntity))
+		{
+			gamestats->Event_WeaponHit(pPlayer, !bIsSecondary, GetClassname(), info);
+		}
+	}
+
+	// Apply an impact effect
+	ImpactEffect(traceHit);
 }
