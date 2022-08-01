@@ -257,7 +257,7 @@ void CWeaponCrowbar::ItemPostFrame()
 	{
 		m_iCrowbarStage = 1;
 		m_flHoldMultiplier = 1.0f;
-		SendWeaponAnim(ACT_VM_HITCENTER);
+		SendWeaponAnim(ACT_VM_HAULBACK);
 		m_flStageUpdate = gpGlobals->curtime + SequenceDuration();
 	}
 
@@ -299,7 +299,7 @@ void CWeaponCrowbar::Swing(int bIsSecondary)
 
 	Vector swingEnd = swingStart + forward * GetRange();
 	UTIL_TraceLine(swingStart, swingEnd, MASK_SHOT_HULL, pOwner, COLLISION_GROUP_NONE, &traceHit);
-	Activity nHitActivity = ACT_VM_HITCENTER;
+	Activity nHitActivity = bIsSecondary ? ACT_VM_HITCENTER : ACT_VM_SWINGHARD;
 
 	// Like bullets, bludgeon traces have to trace against triggers.
 	CTakeDamageInfo triggerInfo(GetOwner(), GetOwner(), GetDamageForActivity(nHitActivity), DMG_CLUB);
@@ -352,7 +352,7 @@ void CWeaponCrowbar::Swing(int bIsSecondary)
 	// -------------------------
 	if (traceHit.fraction == 1.0f)
 	{
-		nHitActivity = bIsSecondary ? ACT_VM_MISSCENTER : ACT_VM_MISSCENTER;
+		nHitActivity = bIsSecondary ? ACT_VM_MISSCENTER : ACT_VM_MISSRIGHT2;
 
 		// We want to test the first swing again
 		Vector testEnd = swingStart + forward * GetRange();
