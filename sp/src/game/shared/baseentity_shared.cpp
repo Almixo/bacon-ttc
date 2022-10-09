@@ -2082,6 +2082,30 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 		gamestats->Event_WeaponHit( pPlayer, info.m_bPrimaryAttack, pPlayer->GetActiveWeapon()->GetClassname(), dmgInfo );
 	}
 #endif
+
+	// Light
+	CBroadcastRecipientFilter filter;
+	Vector src;
+
+	if (this->IsPlayer())
+	{
+		CBasePlayer* player = ToBasePlayer(this);
+		if (player)
+		{
+			src = player->Weapon_ShootPosition();
+		}
+	}
+	else
+	{
+		CBaseAnimating* ent = static_cast<CBaseAnimating*>(this);
+		Vector org;
+		QAngle ang;
+		ent->GetAttachment(1, org, ang);
+		src = org;
+	}
+
+	te->DynamicLight(filter, 0.0, &src, 235, 156, 10, 3, 200, 0.2, 1000);
+
 }
 
 
