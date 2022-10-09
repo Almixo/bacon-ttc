@@ -19,6 +19,7 @@
 #include "engine/IEngineSound.h"
 #include "te_effect_dispatch.h"
 #include "gamestats.h"
+#include "weapon_rpg.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -39,10 +40,20 @@ public:
 
 	CWeapon357( void );
 
+	void	Spawn();
+	bool	Holster(CBaseCombatWeapon* pSwitchingTo = NULL);
 	void	PrimaryAttack( void );
 	void	Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
-
+	void	ItemPostFrame(void);
+	void	ItemBusyFrame(void);
+	void	ManageLaser();
+	bool	Reload();
 	float	WeaponAutoAimScale()	{ return 0.6f; }
+
+	// lasers
+	CSprite	*m_hLaserDot;
+	bool	m_bLaserEnabled = true;
+	float	m_flButtonDelay;
 
 #ifdef MAPBASE
 	int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
@@ -367,15 +378,28 @@ void CWeapon357::PrimaryAttack( void )
 	SendWeaponAnim( ACT_VM_PRIMARYATTACK );
 	pPlayer->SetAnimation( PLAYER_ATTACK1 );
 
-	m_flNextPrimaryAttack = gpGlobals->curtime + 0.75;
-	m_flNextSecondaryAttack = gpGlobals->curtime + 0.75;
+
+	Vector spread;
+
+	if (m_bLaserEnabled)
+	{
+		m_flNextPrimaryAttack = gpGlobals->curtime + 0.75;
+		m_flNextSecondaryAttack = gpGlobals->curtime + 0.75;
+		spread = vec3_origin;
+	}
+	else
+	{
+		m_flNextPrimaryAttack = gpGlobals->curtime + 0.25;
+		m_flNextSecondaryAttack = gpGlobals->curtime + 0.25;
+		spread = Vector(0.1, 0.1, 0.1);
+	}
 
 	m_iClip1--;
 
 	Vector vecSrc		= pPlayer->Weapon_ShootPosition();
 	Vector vecAiming	= pPlayer->GetAutoaimVector( AUTOAIM_SCALE_DEFAULT );	
 
-	pPlayer->FireBullets( 1, vecSrc, vecAiming, vec3_origin, MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 0 );
+	pPlayer->FireBullets( 1, vecSrc, vecAiming, spread, MAX_TRACE_LENGTH, m_iPrimaryAmmoType, 0 );
 
 	pPlayer->SetMuzzleFlashTime( gpGlobals->curtime + 0.5 );
 
@@ -396,5 +420,104 @@ void CWeapon357::PrimaryAttack( void )
 	{
 		// HEV suit - indicate out of ammo condition
 		pPlayer->SetSuitUpdate( "!HEV_AMO0", FALSE, 0 ); 
+	}
+}
+
+
+void CWeapon357::Spawn()
+{
+	return BaseClass::Spawn();
+}
+
+bool CWeapon357::Holster(CBaseCombatWeapon* pSwitchingTo)
+{
+	if (m_hLaserDot)
+	{
+		UTIL_Remove(m_hLaserDot);
+		m_hLaserDot = NULL;
+	}
+
+	return BaseClass::Holster(pSwitchingTo);
+}
+
+bool CWeapon357::Reload()
+{
+	//m_bLaserEnabled = false;
+
+	return BaseClass::Reload();
+}
+
+void CWeapon357::ItemBusyFrame()
+{
+	BaseClass::ItemBusyFrame();
+	ManageLaser();
+}
+
+void CWeapon357::ItemPostFrame()
+{
+	BaseClass::ItemPostFrame();
+	ManageLaser();
+	
+}
+
+void CWeapon357::ManageLaser()
+{
+	// Try a ray
+	CBasePlayer* pOwner = ToBasePlayer(GetOwner());
+	if (!pOwner)
+		return;
+
+	// Update state if exist
+	if (m_hLaserDot)
+	{
+		//Msg("exist\n");
+
+		trace_t traceHit;
+		Vector swingStart = pOwner->Weapon_ShootPosition();
+		Vector forward;
+
+		Vector org;
+		QAngle ang;
+		pOwner->GetAttachment(1, org, ang);
+
+		if (m_flNextPrimaryAttack > gpGlobals->curtime)
+			AngleVectors(ang, &forward);
+		else
+			AngleVectors(pOwner->EyeAngles(), &forward);
+
+		Vector swingEnd = swingStart + forward * MAX_TRACE_LENGTH;
+		UTIL_TraceLine(swingStart, swingEnd, MASK_SOLID, pOwner, COLLISION_GROUP_NONE, &traceHit);
+
+		// update location
+		if (traceHit.fraction != 0)
+			m_hLaserDot->SetAbsOrigin(traceHit.endpos);
+
+
+		// update visibility
+		if (m_bLaserEnabled)
+		{
+			//Msg("visible\n");
+			m_hLaserDot->RemoveEffects(EF_NODRAW);
+		}
+		else
+		{
+			//Msg("not visible\n");
+			m_hLaserDot->AddEffects(EF_NODRAW);
+		}
+
+
+	}
+	else
+	{
+		m_hLaserDot = CSprite::SpriteCreate("sprites/redglow1.vmt", GetAbsOrigin(), false);
+		m_hLaserDot->SetTransparency(kRenderGlow, 255, 255, 255, 255, kRenderFxNoDissipation);
+		m_hLaserDot->SetScale(0.1f);
+	}
+
+	// toggle right click
+	if (m_flButtonDelay < gpGlobals->curtime && pOwner->m_afButtonPressed & IN_ATTACK2)
+	{
+		m_bLaserEnabled = !m_bLaserEnabled;
+		m_flButtonDelay = gpGlobals->curtime + 0.1f;
 	}
 }
