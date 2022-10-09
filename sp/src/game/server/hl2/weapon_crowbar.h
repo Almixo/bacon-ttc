@@ -20,6 +20,8 @@
 
 #define	CROWBAR_RANGE	75.0f
 #define	CROWBAR_REFIRE	0.4f
+#define WRENCH_RANGE_PRIMARY 90.0f
+#define WRENCH_RANGE_SECONDARY 120.0f
 
 //-----------------------------------------------------------------------------
 // CWeaponCrowbar
@@ -56,6 +58,7 @@ public:
 	bool		m_bIsHoldingSecondary;
 	float		m_flHoldUpdate;
 	float		m_flHoldMultiplier;
+	float		m_flHoldRange;
 
 #ifdef MAPBASE
 	// Don't use backup activities

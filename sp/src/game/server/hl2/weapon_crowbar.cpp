@@ -27,7 +27,7 @@ ConVar    sk_plr_dmg_crowbar		( "sk_plr_dmg_crowbar","0");
 ConVar    sk_npc_dmg_crowbar		( "sk_npc_dmg_crowbar","0");
 
 //-----------------------------------------------------------------------------
-// CWeaponCrowbar
+// CWeaponWrench
 //-----------------------------------------------------------------------------
 
 IMPLEMENT_SERVERCLASS_ST(CWeaponCrowbar, DT_WeaponCrowbar)
@@ -257,6 +257,7 @@ void CWeaponCrowbar::ItemPostFrame()
 	{
 		m_iCrowbarStage = 1;
 		m_flHoldMultiplier = 1.0f;
+		m_flHoldRange = 0;
 		SendWeaponAnim(ACT_VM_HAULBACK);
 		m_flStageUpdate = gpGlobals->curtime + SequenceDuration();
 	}
@@ -267,8 +268,11 @@ void CWeaponCrowbar::ItemPostFrame()
 		if (m_flHoldMultiplier < 2.0f)
 			m_flHoldMultiplier += 0.03125f;
 
+		if (m_flHoldRange < WRENCH_RANGE_SECONDARY - WRENCH_RANGE_PRIMARY)
+			m_flHoldRange += (WRENCH_RANGE_SECONDARY - WRENCH_RANGE_PRIMARY) * 0.03125f;
+
 		m_flHoldUpdate = gpGlobals->curtime + 0.1f;
-		//Msg("holding the wrench!, multiplier: %f\n", m_flHoldMultiplier);
+		Msg("holding the wrench!, multiplier: %f\n\n\n", m_flHoldRange);
 	}
 
 	// player released the button, what to do now?
@@ -297,7 +301,7 @@ void CWeaponCrowbar::Swing(int bIsSecondary)
 
 	forward = pOwner->GetAutoaimVector(AUTOAIM_SCALE_DEFAULT, GetRange());
 
-	Vector swingEnd = swingStart + forward * GetRange();
+	Vector swingEnd = swingStart + forward * (WRENCH_RANGE_PRIMARY + m_flHoldRange);
 	UTIL_TraceLine(swingStart, swingEnd, MASK_SHOT_HULL, pOwner, COLLISION_GROUP_NONE, &traceHit);
 	Activity nHitActivity = bIsSecondary ? ACT_VM_HITCENTER : ACT_VM_SWINGHARD;
 
