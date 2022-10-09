@@ -173,7 +173,9 @@ void ScreenOver_f(void)
 		view->SetScreenOverlayMaterial(NULL);
 	}
 
-	cvar->FindVar("r_flashlightfov")->SetValue(115);
+	cvar->FindVar("r_flashlightfov")->SetValue(500);
+	cvar->FindVar("r_flashlightdepthtexture")->SetValue(0);
+	cvar->FindVar("r_flashlightfar")->SetValue(1300);
 
 }
 
