@@ -46,7 +46,7 @@ public:
 	void	Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
 	void	ItemPostFrame(void);
 	void	ItemBusyFrame(void);
-	void	ManageLaser();
+	void	ManageLaser(bool isReloading);
 	bool	Reload();
 	float	WeaponAutoAimScale()	{ return 0.6f; }
 
@@ -450,17 +450,17 @@ bool CWeapon357::Reload()
 void CWeapon357::ItemBusyFrame()
 {
 	BaseClass::ItemBusyFrame();
-	ManageLaser();
+	ManageLaser(true);
 }
 
 void CWeapon357::ItemPostFrame()
 {
 	BaseClass::ItemPostFrame();
-	ManageLaser();
+	ManageLaser(false);
 	
 }
 
-void CWeapon357::ManageLaser()
+void CWeapon357::ManageLaser(bool isReloading)
 {
 	// Try a ray
 	CBasePlayer* pOwner = ToBasePlayer(GetOwner());
@@ -494,14 +494,21 @@ void CWeapon357::ManageLaser()
 
 
 		// update visibility
-		if (m_bLaserEnabled)
+		if(!isReloading)
 		{
-			//Msg("visible\n");
-			m_hLaserDot->RemoveEffects(EF_NODRAW);
+			if (m_bLaserEnabled)
+			{
+				//Msg("visible\n");
+				m_hLaserDot->RemoveEffects(EF_NODRAW);
+			}
+			else
+			{
+				//Msg("not visible\n");
+				m_hLaserDot->AddEffects(EF_NODRAW);
+			}
 		}
 		else
 		{
-			//Msg("not visible\n");
 			m_hLaserDot->AddEffects(EF_NODRAW);
 		}
 
@@ -512,6 +519,7 @@ void CWeapon357::ManageLaser()
 		m_hLaserDot = CSprite::SpriteCreate("sprites/redglow1.vmt", GetAbsOrigin(), false);
 		m_hLaserDot->SetTransparency(kRenderGlow, 255, 255, 255, 255, kRenderFxNoDissipation);
 		m_hLaserDot->SetScale(0.1f);
+		m_hLaserDot->SetAsTemporary();
 	}
 
 	// toggle right click
