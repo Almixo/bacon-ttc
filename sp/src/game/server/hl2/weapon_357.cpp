@@ -33,6 +33,61 @@ extern acttable_t *GetPistolActtable();
 extern int GetPistolActtableCount();
 #endif
 
+const char* g_pDeLaserDotThink = "DeLaserThinkContext";
+
+#define	RPG_BEAM_SPRITE		"effects/laser1_noz.vmt"
+#define	RPG_LASER_SPRITE	"sprites/redglow1.vmt"
+
+//-----------------------------------------------------------------------------
+// Laser Dot
+//-----------------------------------------------------------------------------
+class CDeLaserDot : public CSprite
+{
+	DECLARE_CLASS(CDeLaserDot, CSprite);
+public:
+
+	CDeLaserDot(void);
+	~CDeLaserDot(void);
+
+	static CDeLaserDot* Create(const Vector& origin, CBaseEntity* pOwner = NULL, bool bVisibleDot = true);
+
+	void	SetTargetEntity(CBaseEntity* pTarget) { m_hTargetEnt = pTarget; }
+	CBaseEntity* GetTargetEntity(void) { return m_hTargetEnt; }
+
+	void	SetLaserPosition(const Vector& origin, const Vector& normal);
+	Vector	GetChasePosition();
+	void	TurnOn(void);
+	void	TurnOff(void);
+	bool	IsOn() const { return m_bIsOn; }
+
+	void	Toggle(void);
+
+	void	LaserThink(void);
+
+	int		ObjectCaps() { return (BaseClass::ObjectCaps() & ~FCAP_ACROSS_TRANSITION) | FCAP_DONT_SAVE; }
+
+	void	MakeInvisible(void);
+
+protected:
+	Vector				m_vecSurfaceNormal;
+	EHANDLE				m_hTargetEnt;
+	bool				m_bVisibleLaserDot;
+	bool				m_bIsOn;
+
+	DECLARE_DATADESC();
+public:
+	CDeLaserDot* m_pNext;
+};
+
+
+// a list of laser dots to search quickly
+CEntityClassList<CDeLaserDot> g_DeLaserDotList;
+template <>  CDeLaserDot* CEntityClassList<CDeLaserDot>::m_pClassList = NULL;
+CDeLaserDot* GetDeLaserDotList()
+{
+	return g_DeLaserDotList.m_pClassList;
+}
+
 class CWeapon357 : public CBaseHLCombatWeapon
 {
 	DECLARE_CLASS( CWeapon357, CBaseHLCombatWeapon );
@@ -43,17 +98,27 @@ public:
 	void	Spawn();
 	bool	Holster(CBaseCombatWeapon* pSwitchingTo = NULL);
 	void	PrimaryAttack( void );
+
 	void	Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
 	void	ItemPostFrame(void);
 	void	ItemBusyFrame(void);
-	void	ManageLaser(bool isReloading);
 	bool	Reload();
 	float	WeaponAutoAimScale()	{ return 0.6f; }
 
-	// lasers
-	CSprite	*m_hLaserDot;
-	bool	m_bLaserEnabled = true;
-	float	m_flButtonDelay;
+	//laser crpa
+	void	SuppressGuiding(bool state = true);
+	void	CreateLaserPointer(void);
+	void	UpdateLaserPosition(Vector vecMuzzlePos = vec3_origin, Vector vecEndPos = vec3_origin);
+	Vector	GetLaserPosition(void);
+	void	StartGuiding(void);
+	void	StopGuiding(void);
+	void	ToggleGuiding(void);
+	bool	IsGuiding(void);
+	bool	Deploy(void);
+	//bool	Holster(CBaseCombatWeapon* pSwitchingTo = NULL);
+	void	StartLaserEffects(void);
+	void	StopLaserEffects(void);
+	void	UpdateLaserEffects(void);
 
 #ifdef MAPBASE
 	int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
@@ -95,6 +160,15 @@ public:
 #ifdef MAPBASE
 	DECLARE_ACTTABLE();
 #endif
+
+protected:
+
+	CHandle<CSprite>	m_hLaserMuzzleSprite;
+	CHandle<CBeam>		m_hLaserBeam;
+	CHandle<CDeLaserDot>	m_hLaserDot;
+	bool				m_bInitialStateUpdate;
+	bool				m_bGuiding;
+	bool				m_bHideGuiding;
 };
 
 LINK_ENTITY_TO_CLASS( weapon_357, CWeapon357 );
@@ -381,7 +455,7 @@ void CWeapon357::PrimaryAttack( void )
 
 	Vector spread;
 
-	if (m_bLaserEnabled)
+	if (m_bGuiding)
 	{
 		m_flNextPrimaryAttack = gpGlobals->curtime + 0.75;
 		m_flNextSecondaryAttack = gpGlobals->curtime + 0.75;
@@ -391,7 +465,7 @@ void CWeapon357::PrimaryAttack( void )
 	{
 		m_flNextPrimaryAttack = gpGlobals->curtime + 0.25;
 		m_flNextSecondaryAttack = gpGlobals->curtime + 0.25;
-		spread = Vector(0.1, 0.1, 0.1);
+		spread = Vector(0.3, 0.3, 0.3);
 	}
 
 	m_iClip1--;
@@ -423,7 +497,6 @@ void CWeapon357::PrimaryAttack( void )
 	}
 }
 
-
 void CWeapon357::Spawn()
 {
 	return BaseClass::Spawn();
@@ -431,12 +504,7 @@ void CWeapon357::Spawn()
 
 bool CWeapon357::Holster(CBaseCombatWeapon* pSwitchingTo)
 {
-	if (m_hLaserDot)
-	{
-		UTIL_Remove(m_hLaserDot);
-		m_hLaserDot = NULL;
-	}
-
+	StopGuiding();
 	return BaseClass::Holster(pSwitchingTo);
 }
 
@@ -449,83 +517,572 @@ bool CWeapon357::Reload()
 
 void CWeapon357::ItemBusyFrame()
 {
+	//if(IsGuiding())
+		//SuppressGuiding(true);
+
+	CBasePlayer* pOwner = ToBasePlayer(GetOwner());
+
+	if(pOwner)
+	{
+		int attachment = pOwner->GetViewModel(0)->LookupAttachment("muzzle");
+		Vector cameraOrigin = Vector(0, 0, 0);
+		QAngle cameraAngles = QAngle(0, 0, 0);
+		QAngle ShootAngle;
+		Vector Shootforward;
+		pOwner->EyeVectors(&Shootforward);
+		VectorAngles(Shootforward, ShootAngle);
+
+		if(attachment != -1)
+		{
+			pOwner->GetViewModel(0)->GetAttachmentLocal(attachment, cameraOrigin, cameraAngles);
+		}
+
+		cameraAngles += ShootAngle;
+
+		Vector forward;
+		AngleVectors(cameraAngles, &forward);
+		Vector vecMuzzlePos = pOwner->Weapon_ShootPosition();
+		Vector vecEndPos = vecMuzzlePos + (forward * MAX_TRACE_LENGTH);
+
+		UpdateLaserPosition(vecMuzzlePos, vecEndPos);
+	}
+
+
 	BaseClass::ItemBusyFrame();
-	ManageLaser(true);
 }
 
 void CWeapon357::ItemPostFrame()
 {
 	BaseClass::ItemPostFrame();
-	ManageLaser(false);
+
+	CBasePlayer* pOwner = ToBasePlayer(GetOwner());
+
+	if(pOwner)
+	{
+		// toggle right click
+		if (m_flNextSecondaryAttack < gpGlobals->curtime && pOwner->m_afButtonPressed & IN_ATTACK2)
+		{
+			ToggleGuiding();
+			m_flNextSecondaryAttack = gpGlobals->curtime + 0.5f;
+		}
+	}
+
+	//If we're pulling the weapon out for the first time, wait to draw the laser
+	if ((m_bInitialStateUpdate) && (GetActivity() != ACT_VM_DRAW))
+	{
+		StartGuiding();
+		m_bInitialStateUpdate = false;
+	}
+	
+	if (IsGuiding())
+	{
+		SuppressGuiding(false);
+	}
+
+	//Move the laser
+	if (pOwner)
+	{
+		int attachment = pOwner->GetViewModel(0)->LookupAttachment("muzzle");
+		Vector cameraOrigin = Vector(0, 0, 0);
+		QAngle cameraAngles = QAngle(0, 0, 0);
+		QAngle ShootAngle;
+		Vector Shootforward;
+		pOwner->EyeVectors(&Shootforward);
+		VectorAngles(Shootforward, ShootAngle);
+
+		if (attachment != -1)
+		{
+			pOwner->GetViewModel(0)->GetAttachmentLocal(attachment, cameraOrigin, cameraAngles);
+		}
+
+		cameraAngles += ShootAngle;
+
+		Vector forward;
+		AngleVectors(cameraAngles, &forward);
+		Vector vecMuzzlePos = pOwner->Weapon_ShootPosition();
+		Vector vecEndPos = vecMuzzlePos + (forward * MAX_TRACE_LENGTH);
+
+		UpdateLaserPosition(vecMuzzlePos, vecEndPos);
+	}
+	UpdateLaserEffects();
 	
 }
 
-void CWeapon357::ManageLaser(bool isReloading)
+void CWeapon357::SuppressGuiding(bool state)
 {
-	// Try a ray
-	CBasePlayer* pOwner = ToBasePlayer(GetOwner());
-	if (!pOwner)
-		return;
+	m_bHideGuiding = state;
 
-	// Update state if exist
-	if (m_hLaserDot)
+	if (m_hLaserDot == NULL)
 	{
-		//Msg("exist\n");
+		StartGuiding();
 
-		trace_t traceHit;
-		Vector swingStart = pOwner->Weapon_ShootPosition();
-		Vector forward;
+		//STILL!?
+		if (m_hLaserDot == NULL)
+			return;
+	}
 
-		Vector org;
-		QAngle ang;
-		pOwner->GetAttachment(1, org, ang);
-
-		if (m_flNextPrimaryAttack > gpGlobals->curtime)
-			AngleVectors(ang, &forward);
-		else
-			AngleVectors(pOwner->EyeAngles(), &forward);
-
-		Vector swingEnd = swingStart + forward * MAX_TRACE_LENGTH;
-		UTIL_TraceLine(swingStart, swingEnd, MASK_SOLID, pOwner, COLLISION_GROUP_NONE, &traceHit);
-
-		// update location
-		if (traceHit.fraction != 0)
-			m_hLaserDot->SetAbsOrigin(traceHit.endpos);
-
-
-		// update visibility
-		if(!isReloading)
-		{
-			if (m_bLaserEnabled)
-			{
-				//Msg("visible\n");
-				m_hLaserDot->RemoveEffects(EF_NODRAW);
-			}
-			else
-			{
-				//Msg("not visible\n");
-				m_hLaserDot->AddEffects(EF_NODRAW);
-			}
-		}
-		else
-		{
-			m_hLaserDot->AddEffects(EF_NODRAW);
-		}
-
-
+	if (state)
+	{
+		m_hLaserDot->TurnOff();
+		StopLaserEffects();
 	}
 	else
 	{
-		m_hLaserDot = CSprite::SpriteCreate("sprites/redglow1.vmt", GetAbsOrigin(), false);
-		m_hLaserDot->SetTransparency(kRenderGlow, 255, 255, 255, 255, kRenderFxNoDissipation);
-		m_hLaserDot->SetScale(0.1f);
-		m_hLaserDot->SetAsTemporary();
+		m_hLaserDot->TurnOn();
+		StartLaserEffects();
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+// Output : Vector
+//-----------------------------------------------------------------------------
+Vector CWeapon357::GetLaserPosition(void)
+{
+	CreateLaserPointer();
+
+	if (m_hLaserDot != NULL)
+		return m_hLaserDot->GetAbsOrigin();
+
+	//FIXME: The laser dot sprite is not active, this code should not be allowed!
+	assert(0);
+	return vec3_origin;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+// Output : Returns true if the rocket is being guided, false if it's dumb
+//-----------------------------------------------------------------------------
+bool CWeapon357::IsGuiding(void)
+{
+	return m_bGuiding;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+// Output : Returns true on success, false on failure.
+//-----------------------------------------------------------------------------
+bool CWeapon357::Deploy(void)
+{
+	m_bInitialStateUpdate = true;
+
+	return BaseClass::Deploy();
+}
+
+
+//-----------------------------------------------------------------------------
+// Purpose: Turn on the guiding laser
+//-----------------------------------------------------------------------------
+void CWeapon357::StartGuiding(void)
+{
+	// Don't start back up if we're overriding this
+	if (m_bHideGuiding)
+		return;
+
+	m_bGuiding = true;
+
+	WeaponSound(SPECIAL1);
+
+	CreateLaserPointer();
+	StartLaserEffects();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Turn off the guiding laser
+//-----------------------------------------------------------------------------
+void CWeapon357::StopGuiding(void)
+{
+	m_bGuiding = false;
+
+	WeaponSound(SPECIAL2);
+
+	StopLaserEffects();
+
+	// Kill the dot completely
+	if (m_hLaserDot != NULL)
+	{
+		m_hLaserDot->TurnOff();
+		UTIL_Remove(m_hLaserDot);
+		m_hLaserDot = NULL;
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Toggle the guiding laser
+//-----------------------------------------------------------------------------
+void CWeapon357::ToggleGuiding(void)
+{
+	if (IsGuiding())
+	{
+		StopGuiding();
+		SuppressGuiding(true);
+	}
+	else
+	{
+		StartGuiding();
+		SuppressGuiding(false);
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CWeapon357::UpdateLaserPosition(Vector vecMuzzlePos, Vector vecEndPos)
+{
+	if (vecMuzzlePos == vec3_origin || vecEndPos == vec3_origin)
+	{
+		CBasePlayer* pPlayer = ToBasePlayer(GetOwner());
+		if (!pPlayer)
+			return;
+
+		vecMuzzlePos = pPlayer->Weapon_ShootPosition();
+		Vector	forward;
+
+		if (g_pGameRules->GetAutoAimMode() == AUTOAIM_ON_CONSOLE)
+		{
+			forward = pPlayer->GetAutoaimVector(AUTOAIM_SCALE_DEFAULT);
+		}
+		else
+		{
+			pPlayer->EyeVectors(&forward);
+		}
+
+		vecEndPos = vecMuzzlePos + (forward * MAX_TRACE_LENGTH);
 	}
 
-	// toggle right click
-	if (m_flButtonDelay < gpGlobals->curtime && pOwner->m_afButtonPressed & IN_ATTACK2)
+	//Move the laser dot, if active
+	trace_t	tr;
+
+	// Trace out for the endpoint
+#ifdef PORTAL
+	g_bBulletPortalTrace = true;
+	Ray_t rayLaser;
+	rayLaser.Init(vecMuzzlePos, vecEndPos);
+	UTIL_Portal_TraceRay(rayLaser, (MASK_SHOT & ~CONTENTS_WINDOW), this, COLLISION_GROUP_NONE, &tr);
+	g_bBulletPortalTrace = false;
+#else
+	UTIL_TraceLine(vecMuzzlePos, vecEndPos, (MASK_SHOT & ~CONTENTS_WINDOW), this, COLLISION_GROUP_NONE, &tr);
+#endif
+
+	// Move the laser sprite
+	if (m_hLaserDot != NULL)
 	{
-		m_bLaserEnabled = !m_bLaserEnabled;
-		m_flButtonDelay = gpGlobals->curtime + 0.1f;
+		Vector	laserPos = tr.endpos;
+		m_hLaserDot->SetLaserPosition(laserPos, tr.plane.normal);
+
+		if (tr.DidHitNonWorldEntity())
+		{
+			CBaseEntity* pHit = tr.m_pEnt;
+
+			if ((pHit != NULL) && (pHit->m_takedamage))
+			{
+				m_hLaserDot->SetTargetEntity(pHit);
+			}
+			else
+			{
+				m_hLaserDot->SetTargetEntity(NULL);
+			}
+		}
+		else
+		{
+			m_hLaserDot->SetTargetEntity(NULL);
+		}
 	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose:
+//-----------------------------------------------------------------------------
+void CWeapon357::CreateLaserPointer(void)
+{
+	if (m_hLaserDot != NULL)
+		return;
+
+	m_hLaserDot = CDeLaserDot::Create(GetAbsOrigin(), GetOwnerEntity());
+	m_hLaserDot->TurnOff();
+
+	UpdateLaserPosition();
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Start the effects on the viewmodel of the RPG
+//-----------------------------------------------------------------------------
+void CWeapon357::StartLaserEffects(void)
+{
+	CBasePlayer* pOwner = ToBasePlayer(GetOwner());
+	if (pOwner == NULL)
+		return;
+
+	CBaseViewModel* pBeamEnt = static_cast<CBaseViewModel*>(pOwner->GetViewModel());
+
+	if (m_hLaserBeam == NULL)
+	{
+		m_hLaserBeam = CBeam::BeamCreate(RPG_BEAM_SPRITE, 1.0f);
+
+		if (m_hLaserBeam == NULL)
+		{
+			// We were unable to create the beam
+			Assert(0);
+			return;
+		}
+
+		m_hLaserBeam->EntsInit(pBeamEnt, pBeamEnt);
+
+		// It starts at startPos
+		m_hLaserBeam->SetStartPos(pOwner->Weapon_ShootPosition());
+
+		// This sets up some things that the beam uses to figure out where
+		// it should start and end
+		m_hLaserBeam->PointEntInit(GetLaserPosition(), m_hLaserDot);
+
+		// This makes it so that the laser appears to come from the muzzle of the pistol
+		m_hLaserBeam->SetStartAttachment(LookupAttachment("Muzzle"));
+
+
+		m_hLaserBeam->SetNoise(0);
+		m_hLaserBeam->SetColor(255, 0, 0);
+		m_hLaserBeam->SetScrollRate(0);
+		m_hLaserBeam->SetWidth(0.5f);
+		m_hLaserBeam->SetEndWidth(0.5f);
+		m_hLaserBeam->SetBrightness(128);
+		m_hLaserBeam->SetBeamFlags(SF_BEAM_SHADEIN);
+#ifdef PORTAL
+		m_hLaserBeam->m_bDrawInMainRender = true;
+		m_hLaserBeam->m_bDrawInPortalRender = false;
+#endif
+	}
+	else
+	{
+		m_hLaserBeam->SetBrightness(128);
+	}
+
+	if (m_hLaserMuzzleSprite == NULL)
+	{
+		m_hLaserMuzzleSprite = CSprite::SpriteCreate(RPG_LASER_SPRITE, GetAbsOrigin(), false);
+
+		if (m_hLaserMuzzleSprite == NULL)
+		{
+			// We were unable to create the sprite
+			Assert(0);
+			return;
+		}
+
+#ifdef PORTAL
+		m_hLaserMuzzleSprite->m_bDrawInMainRender = true;
+		m_hLaserMuzzleSprite->m_bDrawInPortalRender = false;
+#endif
+
+		m_hLaserMuzzleSprite->SetAttachment(pOwner->GetViewModel(), LookupAttachment("laser"));
+		m_hLaserMuzzleSprite->SetTransparency(kRenderTransAdd, 255, 255, 255, 255, kRenderFxNoDissipation);
+		m_hLaserMuzzleSprite->SetBrightness(255, 0.5f);
+		m_hLaserMuzzleSprite->SetScale(0.25f, 0.5f);
+		m_hLaserMuzzleSprite->TurnOn();
+	}
+	else
+	{
+		m_hLaserMuzzleSprite->TurnOn();
+		m_hLaserMuzzleSprite->SetScale(0.25f, 0.25f);
+		m_hLaserMuzzleSprite->SetBrightness(255);
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Stop the effects on the viewmodel of the RPG
+//-----------------------------------------------------------------------------
+void CWeapon357::StopLaserEffects(void)
+{
+	if (m_hLaserBeam != NULL)
+	{
+		m_hLaserBeam->SetBrightness(0);
+		m_hLaserBeam->TurnOff();
+		UTIL_Remove(m_hLaserBeam);
+		m_hLaserBeam = NULL;
+	}
+
+	if (m_hLaserMuzzleSprite != NULL)
+	{
+		m_hLaserMuzzleSprite->SetScale(0.01f);
+		m_hLaserMuzzleSprite->SetBrightness(0, 0.5f);
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: Pulse all the effects to make them more... well, laser-like
+//-----------------------------------------------------------------------------
+void CWeapon357::UpdateLaserEffects(void)
+{
+	if (!m_bGuiding)
+		return;
+
+	if (m_hLaserBeam != NULL)
+	{
+		m_hLaserBeam->SetBrightness(128 + random->RandomInt(-8, 8));
+	}
+
+	if (m_hLaserMuzzleSprite != NULL)
+	{
+		m_hLaserMuzzleSprite->SetScale(0.1f + random->RandomFloat(-0.025f, 0.025f));
+	}
+}
+
+//=============================================================================
+// Laser Dot
+//=============================================================================
+
+LINK_ENTITY_TO_CLASS(env_delaserdot, CDeLaserDot);
+
+BEGIN_DATADESC(CDeLaserDot)
+DEFINE_FIELD(m_vecSurfaceNormal, FIELD_VECTOR),
+DEFINE_FIELD(m_hTargetEnt, FIELD_EHANDLE),
+DEFINE_FIELD(m_bVisibleLaserDot, FIELD_BOOLEAN),
+DEFINE_FIELD(m_bIsOn, FIELD_BOOLEAN),
+
+//DEFINE_FIELD( m_pNext, FIELD_CLASSPTR ),	// don't save - regenerated by constructor
+DEFINE_THINKFUNC(LaserThink),
+END_DATADESC()
+
+
+//-----------------------------------------------------------------------------
+// Finds missiles in cone
+//-----------------------------------------------------------------------------
+CBaseEntity* CreateDeLaserDot(const Vector& origin, CBaseEntity* pOwner, bool bVisibleDot)
+{
+	return CDeLaserDot::Create(origin, pOwner, bVisibleDot);
+}
+
+void SetDeLaserDotTarget(CBaseEntity* pLaserDot, CBaseEntity* pTarget)
+{
+	CDeLaserDot* pDot = assert_cast<CDeLaserDot*>(pLaserDot);
+	pDot->SetTargetEntity(pTarget);
+}
+
+void EnableDeLaserDot(CBaseEntity* pLaserDot, bool bEnable)
+{
+	CDeLaserDot* pDot = assert_cast<CDeLaserDot*>(pLaserDot);
+	if (bEnable)
+	{
+		pDot->TurnOn();
+	}
+	else
+	{
+		pDot->TurnOff();
+	}
+}
+
+CDeLaserDot::CDeLaserDot(void)
+{
+	m_hTargetEnt = NULL;
+	m_bIsOn = true;
+	g_DeLaserDotList.Insert(this);
+}
+
+CDeLaserDot::~CDeLaserDot(void)
+{
+	g_DeLaserDotList.Remove(this);
+}
+
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+// Input  : &origin - 
+// Output : CLaserDot
+//-----------------------------------------------------------------------------
+CDeLaserDot* CDeLaserDot::Create(const Vector& origin, CBaseEntity* pOwner, bool bVisibleDot)
+{
+	CDeLaserDot* pLaserDot = (CDeLaserDot*)CBaseEntity::Create("env_delaserdot", origin, QAngle(0, 0, 0));
+
+	if (pLaserDot == NULL)
+		return NULL;
+
+	pLaserDot->m_bVisibleLaserDot = bVisibleDot;
+	pLaserDot->SetMoveType(MOVETYPE_NONE);
+	pLaserDot->AddSolidFlags(FSOLID_NOT_SOLID);
+	pLaserDot->AddEffects(EF_NOSHADOW);
+	UTIL_SetSize(pLaserDot, vec3_origin, vec3_origin);
+
+	//Create the graphic
+	pLaserDot->SpriteInit("sprites/redglow1.vmt", origin);
+
+	pLaserDot->SetName(AllocPooledString("TEST"));
+
+	pLaserDot->SetTransparency(kRenderGlow, 255, 255, 255, 255, kRenderFxNoDissipation);
+	pLaserDot->SetScale(0.5f);
+
+	pLaserDot->SetOwnerEntity(pOwner);
+
+	pLaserDot->SetContextThink(&CDeLaserDot::LaserThink, gpGlobals->curtime + 0.1f, g_pDeLaserDotThink);
+	pLaserDot->SetSimulatedEveryTick(true);
+
+	if (!bVisibleDot)
+	{
+		pLaserDot->MakeInvisible();
+	}
+
+	return pLaserDot;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CDeLaserDot::LaserThink(void)
+{
+	SetNextThink(gpGlobals->curtime + 0.05f, g_pDeLaserDotThink);
+
+	if (GetOwnerEntity() == NULL)
+		return;
+
+	Vector	viewDir = GetAbsOrigin() - GetOwnerEntity()->GetAbsOrigin();
+	float	dist = VectorNormalize(viewDir);
+
+	float	scale = RemapVal(dist, 32, 1024, 0.01f, 0.5f);
+	float	scaleOffs = random->RandomFloat(-scale * 0.25f, scale * 0.25f);
+
+	scale = clamp(scale + scaleOffs, 0.1f, 32.0f);
+
+	SetScale(scale);
+}
+
+void CDeLaserDot::SetLaserPosition(const Vector& origin, const Vector& normal)
+{
+	SetAbsOrigin(origin);
+	m_vecSurfaceNormal = normal;
+}
+
+Vector CDeLaserDot::GetChasePosition()
+{
+	return GetAbsOrigin() - m_vecSurfaceNormal * 10;
+}
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CDeLaserDot::TurnOn(void)
+{
+	m_bIsOn = true;
+	if (m_bVisibleLaserDot)
+	{
+		BaseClass::TurnOn();
+	}
+}
+
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CDeLaserDot::TurnOff(void)
+{
+	m_bIsOn = false;
+	if (m_bVisibleLaserDot)
+	{
+		BaseClass::TurnOff();
+	}
+}
+
+
+//-----------------------------------------------------------------------------
+// Purpose: 
+//-----------------------------------------------------------------------------
+void CDeLaserDot::MakeInvisible(void)
+{
+	BaseClass::TurnOff();
 }
