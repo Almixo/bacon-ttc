@@ -52,8 +52,7 @@ static ConVar r_flashlightladderdist( "r_flashlightladderdist", "40.0", FCVAR_CH
 static ConVar mat_slopescaledepthbias_shadowmap( "mat_slopescaledepthbias_shadowmap", "16", FCVAR_CHEAT );
 static ConVar mat_depthbias_shadowmap(	"mat_depthbias_shadowmap", "0.0005", FCVAR_CHEAT  );
 #else
-extern ConVarRef mat_slopescaledepthbias_shadowmap;
-extern ConVarRef mat_depthbias_shadowmap;
+
 #endif
 #ifdef MAPBASE
 static ConVar r_flashlighttextureoverride( "r_flashlighttextureoverride", "", FCVAR_CHEAT );

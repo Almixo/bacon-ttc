@@ -236,4 +236,7 @@ void LoadHudTextures( CUtlDict< CHudTexture *, int >& list, const char *szFilena
 
 void GetHudSize( int& w, int &h );
 
+extern ConVarRef mat_slopescaledepthbias_shadowmap;
+extern ConVarRef mat_depthbias_shadowmap;
+
 #endif // HUD_H

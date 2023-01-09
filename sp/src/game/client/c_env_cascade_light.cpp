@@ -17,9 +17,9 @@
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
+ConVarRef mat_slopescaledepthbias_shadowmap("mat_slopescaledepthbias_shadowmap");
+ConVarRef mat_depthbias_shadowmap("mat_depthbias_shadowmap");
 
-static ConVarRef mat_slopescaledepthbias_shadowmap("mat_slopescaledepthbias_shadowmap");
-static ConVarRef mat_depthbias_shadowmap("mat_depthbias_shadowmap");
 static ConVar scissor("r_flashlightscissor", "0");
 ConVar csm_enable("csm_enable", "1");
 

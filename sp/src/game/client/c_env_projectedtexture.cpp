@@ -25,8 +25,6 @@
 #include "tier0/memdbgon.h"
 
 #ifdef ASW_PROJECTED_TEXTURES
-extern ConVarRef mat_slopescaledepthbias_shadowmap;
-extern ConVarRef mat_depthbias_shadowmap;
 
 float C_EnvProjectedTexture::m_flVisibleBBoxMinHeight = -FLT_MAX;
 
