@@ -7253,6 +7253,10 @@ void CBasePlayer::UpdateClientData( void )
 	WRITE_SHORT(FlashlightIsOn());
 	MessageEnd();
 	
+	if (FlashlightIsOn())
+	{
+		UTIL_ScreenFade(this, { 0, 255, 0, 60 }, 0.1, 0.01, (FFADE_OUT));
+	}
 
 	if (m_ArmorValue != m_iClientBattery)
 	{

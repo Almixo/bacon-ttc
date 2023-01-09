@@ -160,7 +160,7 @@ void UpdateFullScreenDepthTexture( void )
 void ScreenOver_f(void)
 {
 	//This is the texture we are going to use for the 'effect' - never use an ext on material files
-	IMaterial* pMaterial = materials->FindMaterial("HUDoverlays/nightvision", TEXTURE_GROUP_OTHER, true);
+	IMaterial* pMaterial = materials->FindMaterial("effects/nightvisioneffect001", TEXTURE_GROUP_OTHER, true);
 
 	if (gHUD.isFlashlightOn)
 	{
