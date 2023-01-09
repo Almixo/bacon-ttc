@@ -96,6 +96,10 @@
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
+
+const char* maxprojlights = CommandLine()->ParmValue("-ptmax", "10");
+ConVar pr_max("pr_max", maxprojlights, 0, "Changes maximum of enabled env_projectedtexture and everything related to it at one time.");
+
 static ConVar r_flashlightdrawfrustum( "r_flashlightdrawfrustum", "0" );
 static ConVar r_flashlightmodels( "r_flashlightmodels", "1" );
 static ConVar r_shadowrendertotexture( "r_shadowrendertotexture", "0" );
@@ -112,22 +116,15 @@ ConVar r_flashlightdepthtexture( "r_flashlightdepthtexture", "1" );
 #if defined( _X360 )
 ConVar r_flashlightdepthres( "r_flashlightdepthres", "512" );
 #else
-#ifdef MAPBASE
-ConVar r_flashlightdepthres( "r_flashlightdepthres", "2048" );
-#else
-ConVar r_flashlightdepthres( "r_flashlightdepthres", "1024" );
-#endif
+const char* projlightres = CommandLine()->ParmValue("-ptr", "2048"); //ѕараметр запуска обазначающий разрешение env_projectedtexture
+
+ConVar r_flashlightdepthres("r_flashlightdepthres", projlightres, 0, "Changes resolution of env_projectedtexture and everything related to it.");
 #endif
 
 #ifdef ASW_PROJECTED_TEXTURES
 ConVar r_threaded_client_shadow_manager( "r_threaded_client_shadow_manager", "1" );
 #else
 ConVar r_threaded_client_shadow_manager( "r_threaded_client_shadow_manager", "0" );
-#endif
-
-#ifdef MAPBASE
-ConVarRef mat_slopescaledepthbias_shadowmap( "mat_slopescaledepthbias_shadowmap" );
-ConVarRef mat_depthbias_shadowmap( "mat_depthbias_shadowmap" );
 #endif
 
 #ifdef _WIN32
@@ -1399,14 +1396,7 @@ bool CClientShadowMgr::Init()
 
 	SetShadowBlobbyCutoffArea( 0.005 );
 
-#ifndef MAPBASE
-	bool bTools = CommandLine()->CheckParm( "-tools" ) != NULL;
-	m_nMaxDepthTextureShadows = bTools ? 4 : 1;	// Just one shadow depth texture in games, more in tools
-#else
-	// 5 lets mappers use up to 4 shadow-casting projected textures, which is better than 3.
-	int iNumShadows = CommandLine()->ParmValue( "-numshadowtextures", 5 );
-	m_nMaxDepthTextureShadows = iNumShadows;
-#endif
+	m_nMaxDepthTextureShadows = pr_max.GetInt();
 
 	bool bLowEnd = ( g_pMaterialSystemHardwareConfig->GetDXSupportLevel() < 80 );
 
@@ -1428,15 +1418,6 @@ bool CClientShadowMgr::Init()
 	}
 
 	materials->AddRestoreFunc( ShadowRestoreFunc );
-
-#ifdef MAPBASE
-	// These need to be referenced here since the cvars don't exist in the initial declaration
-	mat_slopescaledepthbias_shadowmap = ConVarRef( "mat_slopescaledepthbias_shadowmap" );
-	mat_depthbias_shadowmap = ConVarRef( "mat_depthbias_shadowmap" );
-
-	mat_slopescaledepthbias_shadowmap.SetValue( "16" ); // Would do something like 2 here, but it causes citizens to look weird under flashlights
-	mat_depthbias_shadowmap.SetValue( "0.00005" );
-#endif
 
 	return true;
 }
@@ -2338,20 +2319,25 @@ void CClientShadowMgr::BuildWorldToShadowMatrix( VMatrix& matWorldToShadow,	cons
 	matWorldToShadow[3][3] = 1.0f;
 }
 
+
 void CClientShadowMgr::BuildPerspectiveWorldToFlashlightMatrix( VMatrix& matWorldToShadow, const FlashlightState_t &flashlightState )
 {
 	VPROF_BUDGET( "CClientShadowMgr::BuildPerspectiveWorldToFlashlightMatrix", VPROF_BUDGETGROUP_SHADOW_DEPTH_TEXTURING );
 
 	// Buildworld to shadow matrix, then perspective projection and concatenate
-	VMatrix matWorldToShadowView, matPerspective;
-	BuildWorldToShadowMatrix( matWorldToShadowView, flashlightState.m_vecLightOrigin,
-							  flashlightState.m_quatOrientation );
+	VMatrix matWorldToShadowView, matPerspective, addW, scaleHalf;
 
-	MatrixBuildPerspective( matPerspective, flashlightState.m_fHorizontalFOVDegrees,
-							flashlightState.m_fVerticalFOVDegrees,
-							flashlightState.m_NearZ, flashlightState.m_FarZ );
+	BuildWorldToShadowMatrix(matWorldToShadowView, flashlightState.m_vecLightOrigin,
+		flashlightState.m_quatOrientation);
 
-	MatrixMultiply( matPerspective, matWorldToShadowView, matWorldToShadow );
+		MatrixBuildPerspective(matPerspective, flashlightState.m_fHorizontalFOVDegrees,
+			flashlightState.m_fVerticalFOVDegrees,
+			flashlightState.m_NearZ, flashlightState.m_FarZ);
+
+
+	MatrixMultiply(matPerspective, matWorldToShadowView, matWorldToShadow);
+
+
 }
 
 #ifdef ASW_PROJECTED_TEXTURES
@@ -4484,18 +4470,13 @@ void CClientShadowMgr::ComputeShadowDepthTextures( const CViewSetup &viewSetup )
 		}
 
 		CViewSetup shadowView;
-#ifndef MAPBASE
 		shadowView.m_flAspectRatio = 1.0f;
-#endif
 		shadowView.x = shadowView.y = 0;
 		shadowView.width = shadowDepthTexture->GetActualWidth();
 		shadowView.height = shadowDepthTexture->GetActualHeight();
 #ifndef ASW_PROJECTED_TEXTURES
 		shadowView.m_bOrtho = false;
 		shadowView.m_bDoBloomAndToneMapping = false;
-#ifdef MAPBASE
-		shadowView.m_flAspectRatio = (flashlightState.m_fHorizontalFOVDegrees / flashlightState.m_fVerticalFOVDegrees);
-#endif // MAPBASE
 #endif
 
 		// Copy flashlight parameters
@@ -4503,10 +4484,6 @@ void CClientShadowMgr::ComputeShadowDepthTextures( const CViewSetup &viewSetup )
 		if ( !flashlightState.m_bOrtho )
 		{
 			shadowView.m_bOrtho = false;
-
-#ifdef MAPBASE
-			shadowView.m_flAspectRatio = (flashlightState.m_fHorizontalFOVDegrees / flashlightState.m_fVerticalFOVDegrees);
-#endif // MAPBASE
 		}
 		else
 		{
@@ -4515,10 +4492,6 @@ void CClientShadowMgr::ComputeShadowDepthTextures( const CViewSetup &viewSetup )
 			shadowView.m_OrthoTop = flashlightState.m_fOrthoTop;
 			shadowView.m_OrthoRight = flashlightState.m_fOrthoRight;
 			shadowView.m_OrthoBottom = flashlightState.m_fOrthoBottom;
-
-#ifdef MAPBASE
-			shadowView.m_flAspectRatio = 1.0f;
-#endif
 		}
 
 		shadowView.m_bDoBloomAndToneMapping = false;
