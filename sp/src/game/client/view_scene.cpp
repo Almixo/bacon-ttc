@@ -174,9 +174,13 @@ void ScreenOver_f(void)
 	}
 
 	cvar->FindVar("r_flashlightfov")->SetValue(500);
-	cvar->FindVar("r_flashlightdepthtexture")->SetValue(0);
+	//cvar->FindVar("r_flashlightdepthtexture")->SetValue(0);
 	cvar->FindVar("r_flashlightfar")->SetValue(1300);
-
+	
+	//cvar->FindVar("mat_depthbias_shadowmap")->SetValue(0.00001f);
+	//cvar->FindVar("mat_slopescaledepthbias_shadowmap ")->SetValue(4);
+	//cvar->FindVar("r_flashlightdepthres")->SetValue(4096);
+	//cvar->FindVar("csm_filter")->SetValue(0.2f);
 }
 
 
