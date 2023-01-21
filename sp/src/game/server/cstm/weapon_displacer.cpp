@@ -121,7 +121,7 @@ void CDisplacer::ItemPostFrame(void)
 
 			DevWarning("The entity name is %s.\n", pFound->GetDebugName()); //spews warning into console, can be removed
 
-			DevWarning("keyval is %s.", keyval); //spews warning into console, can be removed
+			DevWarning("keyval is %s.\n", keyval); //spews warning into console, can be removed
 
 			auto ptemp = gEntList.FindEntityByName(NULL, keyval); //trying to find the last entity e.g. the entity to teleport to.
 			if (!ptemp)

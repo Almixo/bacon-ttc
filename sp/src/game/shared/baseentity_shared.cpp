@@ -2104,7 +2104,7 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 		src = org;
 	}
 
-	te->DynamicLight(filter, 0.0, &src, 235, 156, 10, 3, 200, 0.2, 1000);
+	te->DynamicLight(filter, 0.0, &src, 235, 156, 10, 5, 250, 0.2, 1000);
 
 }
 

@@ -23,7 +23,7 @@ void CDispPoint::Spawn(void)
 	SetSize( VECTORMIN, VECTORMAX );
 
 	Vector vOrg = GetAbsOrigin();
-	DevWarning("%s spawned at %f %f %f!\n", GetDebugName(), vOrg[0], vOrg[1], vOrg[2]);
+	DevWarning("%s spawned at %g %g %g!\n", GetDebugName(), vOrg.x, vOrg.y, vOrg.z);
 
 	SetNextThink( TICK_NEVER_THINK );
 }
