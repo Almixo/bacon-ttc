@@ -272,7 +272,7 @@ void CWeaponCrowbar::ItemPostFrame()
 			m_flHoldRange += (WRENCH_RANGE_SECONDARY - WRENCH_RANGE_PRIMARY) * 0.03125f;
 
 		m_flHoldUpdate = gpGlobals->curtime + 0.1f;
-		Msg("holding the wrench!, multiplier: %f\n\n\n", m_flHoldRange);
+		//Msg("holding the wrench!, multiplier: %f\n\n\n", m_flHoldRange);
 	}
 
 	// player released the button, what to do now?

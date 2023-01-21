@@ -6233,6 +6233,7 @@ void CBasePlayer::ImpulseCommands( )
 		{
 			FlashlightTurnOn();
 		}
+		UTIL_ScreenFade(this, { 0, 0, 0, 255 }, 0.2, 0.1, (FFADE_OUT));
 		break;
 
 	case 200:
@@ -7255,7 +7256,7 @@ void CBasePlayer::UpdateClientData( void )
 	
 	if (FlashlightIsOn())
 	{
-		UTIL_ScreenFade(this, { 0, 255, 0, 60 }, 0.1, 0.01, (FFADE_OUT));
+		UTIL_ScreenFade(this, { 0, 255, 0, 60 }, 0.1, 0.01, (FFADE_IN));
 	}
 
 	if (m_ArmorValue != m_iClientBattery)

@@ -17,8 +17,8 @@
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
-ConVarRef mat_slopescaledepthbias_shadowmap("mat_slopescaledepthbias_shadowmap");
-ConVarRef mat_depthbias_shadowmap("mat_depthbias_shadowmap");
+ConVarRef mat_slopescaledepthbias_shadowmap("mat_slopescaledepthbias_shadowmap", "4");
+ConVarRef mat_depthbias_shadowmap("mat_depthbias_shadowmap", "0.00001");
 
 static ConVar scissor("r_flashlightscissor", "0");
 ConVar csm_enable("csm_enable", "1");
@@ -69,7 +69,7 @@ void C_LightOrigin::Simulate()
 	BaseClass::Simulate();
 }
 
-ConVar bebra("csm_filter", "1"); //if you have r_flashlightdepthres 4096 then better to change this value to 0.5
+ConVar bebra("csm_filter", "0.2"); //if you have r_flashlightdepthres 4096 then better to change this value to 0.5
 
 
 //-----------------------------------------------------------------------------
