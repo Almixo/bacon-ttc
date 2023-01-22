@@ -54,7 +54,7 @@ END_DATADESC();
 CDisplacer::CDisplacer(void)
 {
 	m_bReloadsSingly	= false;
-	m_bFiresUnderwater	= false;
+	m_bFiresUnderwater	= false;	
 
 	fNextThink			= 0;
 	pFound				= NULL;
