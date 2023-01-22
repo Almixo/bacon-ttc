@@ -1396,7 +1396,6 @@ bool CClientShadowMgr::Init()
 
 	SetShadowBlobbyCutoffArea( 0.005 );
 
-	m_nMaxDepthTextureShadows = pr_max.GetInt();
 
 	bool bLowEnd = ( g_pMaterialSystemHardwareConfig->GetDXSupportLevel() < 80 );
 
@@ -2336,6 +2335,8 @@ void CClientShadowMgr::BuildPerspectiveWorldToFlashlightMatrix( VMatrix& matWorl
 
 
 	MatrixMultiply(matPerspective, matWorldToShadowView, matWorldToShadow);
+	BuildWorldToShadowMatrix( matWorldToShadowView, flashlightState.m_vecLightOrigin,
+							  flashlightState.m_quatOrientation );
 
 
 }

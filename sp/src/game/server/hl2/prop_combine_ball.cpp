@@ -26,6 +26,7 @@
 #include "eventqueue.h"
 #include "physics_collisionevent.h"
 #include "gamestats.h"
+#include "beam_shared.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -772,7 +773,7 @@ void CPropCombineBall::FadeOut( float flDuration )
 //-----------------------------------------------------------------------------
 void CPropCombineBall::StartWhizSoundThink( void )
 {
-	SetContextThink( &CPropCombineBall::WhizSoundThink, gpGlobals->curtime + 2.0f * TICK_INTERVAL, s_pWhizThinkContext );
+	SetContextThink( &CPropCombineBall::WhizSoundThink, gpGlobals->curtime + 0.5f * TICK_INTERVAL, s_pWhizThinkContext );
 }
 
 //-----------------------------------------------------------------------------
@@ -780,57 +781,96 @@ void CPropCombineBall::StartWhizSoundThink( void )
 //-----------------------------------------------------------------------------
 void CPropCombineBall::WhizSoundThink()
 {
-	Vector vecPosition, vecVelocity;
-	IPhysicsObject *pPhysicsObject = VPhysicsGetObject();
-	
-	if ( pPhysicsObject == NULL )
+	if(m_flWhizSoundUpdate < gpGlobals->curtime)
 	{
-		//NOTENOTE: We should always have been created at this point
-		Assert( 0 );
-		SetContextThink( &CPropCombineBall::WhizSoundThink, gpGlobals->curtime + 2.0f * TICK_INTERVAL, s_pWhizThinkContext );
-		return;
-	}
+		Vector vecPosition, vecVelocity;
+		IPhysicsObject* pPhysicsObject = VPhysicsGetObject();
 
-	pPhysicsObject->GetPosition( &vecPosition, NULL );
-	pPhysicsObject->GetVelocity( &vecVelocity, NULL );
-	
-	// Multiplayer equivelent, loops through players and decides if it should go or not, like SP.
-	if ( gpGlobals->maxClients > 1 )
-	{
-		CBasePlayer *pPlayer = NULL;
-
-		for (int i = 1;i <= gpGlobals->maxClients; i++)
+		if (pPhysicsObject == NULL)
 		{
-			pPlayer = UTIL_PlayerByIndex( i );
-			if ( pPlayer )
+			//NOTENOTE: We should always have been created at this point
+			Assert(0);
+			SetContextThink(&CPropCombineBall::WhizSoundThink, gpGlobals->curtime + 2.0f * TICK_INTERVAL, s_pWhizThinkContext);
+			return;
+		}
+
+		pPhysicsObject->GetPosition(&vecPosition, NULL);
+		pPhysicsObject->GetVelocity(&vecVelocity, NULL);
+
+		// Multiplayer equivelent, loops through players and decides if it should go or not, like SP.
+		if (gpGlobals->maxClients > 1)
+		{
+			CBasePlayer* pPlayer = NULL;
+
+			for (int i = 1; i <= gpGlobals->maxClients; i++)
+			{
+				pPlayer = UTIL_PlayerByIndex(i);
+				if (pPlayer)
+				{
+					Vector vecDelta;
+					VectorSubtract(pPlayer->GetAbsOrigin(), vecPosition, vecDelta);
+					VectorNormalize(vecDelta);
+					if (DotProduct(vecDelta, vecVelocity) > 0.5f)
+					{
+						Vector vecEndPoint;
+						VectorMA(vecPosition, 2.0f * TICK_INTERVAL, vecVelocity, vecEndPoint);
+						float flDist = CalcDistanceToLineSegment(pPlayer->GetAbsOrigin(), vecPosition, vecEndPoint);
+						if (flDist < 200.0f)
+						{
+							// We're basically doing what CPASAttenuationFilter does, on a per-user basis, if it passes we create the filter and send off the sound
+							// if it doesn't, we skip the player.
+							float distance, maxAudible;
+							Vector vecRelative;
+
+							VectorSubtract(pPlayer->EarPosition(), vecPosition, vecRelative);
+							distance = VectorLength(vecRelative);
+							maxAudible = (2 * SOUND_NORMAL_CLIP_DIST) / ATTN_NORM;
+							if (distance <= maxAudible)
+								continue;
+
+							// Set the recipient to the player it checked against so multiple sounds don't play.
+							CSingleUserRecipientFilter filter(pPlayer);
+
+							EmitSound_t ep;
+							ep.m_nChannel = CHAN_STATIC;
+							if (hl2_episodic.GetBool())
+							{
+								ep.m_pSoundName = "NPC_CombineBall_Episodic.WhizFlyby";
+							}
+							else
+							{
+								ep.m_pSoundName = "NPC_CombineBall.WhizFlyby";
+							}
+							ep.m_flVolume = 1.0f;
+							ep.m_SoundLevel = SNDLVL_NORM;
+
+							EmitSound(filter, entindex(), ep);
+						}
+					}
+				}
+			}
+		}
+		else
+		{
+			CBasePlayer* pPlayer = UTIL_GetLocalPlayer();
+
+			if (pPlayer)
 			{
 				Vector vecDelta;
-				VectorSubtract( pPlayer->GetAbsOrigin(), vecPosition, vecDelta );
-				VectorNormalize( vecDelta );
-				if ( DotProduct( vecDelta, vecVelocity ) > 0.5f )
+				VectorSubtract(pPlayer->GetAbsOrigin(), vecPosition, vecDelta);
+				VectorNormalize(vecDelta);
+				if (DotProduct(vecDelta, vecVelocity) > 0.5f)
 				{
 					Vector vecEndPoint;
-					VectorMA( vecPosition, 2.0f * TICK_INTERVAL, vecVelocity, vecEndPoint );
-					float flDist = CalcDistanceToLineSegment( pPlayer->GetAbsOrigin(), vecPosition, vecEndPoint );
-					if ( flDist < 200.0f )
+					VectorMA(vecPosition, 2.0f * TICK_INTERVAL, vecVelocity, vecEndPoint);
+					float flDist = CalcDistanceToLineSegment(pPlayer->GetAbsOrigin(), vecPosition, vecEndPoint);
+					if (flDist < 200.0f)
 					{
-						// We're basically doing what CPASAttenuationFilter does, on a per-user basis, if it passes we create the filter and send off the sound
-						// if it doesn't, we skip the player.
-						float distance, maxAudible;
-						Vector vecRelative;
-
-						VectorSubtract( pPlayer->EarPosition(), vecPosition, vecRelative );
-						distance = VectorLength( vecRelative );
-						maxAudible = ( 2 * SOUND_NORMAL_CLIP_DIST ) / ATTN_NORM;
-						if ( distance <= maxAudible )
-							continue;
-
-						// Set the recipient to the player it checked against so multiple sounds don't play.
-						CSingleUserRecipientFilter filter( pPlayer );
+						CPASAttenuationFilter filter(vecPosition, ATTN_NORM);
 
 						EmitSound_t ep;
 						ep.m_nChannel = CHAN_STATIC;
-						if ( hl2_episodic.GetBool() )
+						if (hl2_episodic.GetBool())
 						{
 							ep.m_pSoundName = "NPC_CombineBall_Episodic.WhizFlyby";
 						}
@@ -841,54 +881,76 @@ void CPropCombineBall::WhizSoundThink()
 						ep.m_flVolume = 1.0f;
 						ep.m_SoundLevel = SNDLVL_NORM;
 
-						EmitSound( filter, entindex(), ep );
+						EmitSound(filter, entindex(), ep);
+
+						SetContextThink(&CPropCombineBall::WhizSoundThink, gpGlobals->curtime + 0.5f, s_pWhizThinkContext);
+						return;
 					}
 				}
 			}
+
 		}
+
+		m_flWhizSoundUpdate = gpGlobals->curtime + 2.0f;
 	}
-	else
+
+	//Msg("baller\n");
+	if (m_bisFromDisplacer)
 	{
-		CBasePlayer *pPlayer = UTIL_GetLocalPlayer();
+		// Float entity around
+		CBaseEntity* pTarget = NULL;
 
-		if ( pPlayer )
+		while ((pTarget = gEntList.FindEntityInSphere(pTarget, GetAbsOrigin(), 100.0f)) != NULL)
 		{
-			Vector vecDelta;
-			VectorSubtract( pPlayer->GetAbsOrigin(), vecPosition, vecDelta );
-			VectorNormalize( vecDelta );
-			if ( DotProduct( vecDelta, vecVelocity ) > 0.5f )
+			if (!pTarget->IsPlayer())
 			{
-				Vector vecEndPoint;
-				VectorMA( vecPosition, 2.0f * TICK_INTERVAL, vecVelocity, vecEndPoint );
-				float flDist = CalcDistanceToLineSegment( pPlayer->GetAbsOrigin(), vecPosition, vecEndPoint );
-				if ( flDist < 200.0f )
-				{
-					CPASAttenuationFilter filter( vecPosition, ATTN_NORM );
+				Msg("hit entity %s", pTarget->GetClassname());
 
-					EmitSound_t ep;
-					ep.m_nChannel = CHAN_STATIC;
-					if ( hl2_episodic.GetBool() )
-					{
-						ep.m_pSoundName = "NPC_CombineBall_Episodic.WhizFlyby";
-					}
-					else
-					{
-						ep.m_pSoundName = "NPC_CombineBall.WhizFlyby";
-					}
-					ep.m_flVolume = 1.0f;
-					ep.m_SoundLevel = SNDLVL_NORM;
-
-					EmitSound( filter, entindex(), ep );
-
-					SetContextThink( &CPropCombineBall::WhizSoundThink, gpGlobals->curtime + 0.5f, s_pWhizThinkContext );
-					return;
-				}
+				CTakeDamageInfo info(this, GetOwnerEntity(), GetAbsVelocity(), GetAbsOrigin(), 0, DMG_DISSOLVE);
+				//info.SetDamage(0);
+				info.SetDamageForce(GetAbsVelocity() / 2);
+				pTarget->TakeDamage(info);
 			}
 		}
 
+		// Beams effect
+		Vector vecOrigin, vecDest;
+		vecOrigin = vecDest = GetAbsOrigin();
+		float fRadius = 100.0f;
+		trace_t tr;
+
+		vecDest = fRadius * (Vector(RandomFloat(-1, 1), RandomFloat(-1, 1), RandomFloat(-1, 1)).Normalized());
+
+		UTIL_TraceLine(vecOrigin, vecOrigin + vecDest, MASK_SOLID_BRUSHONLY, this, COLLISION_GROUP_NONE, &tr);
+
+		if (tr.fraction != 1.0)
+		{
+			CBeam* pBeam = CBeam::BeamCreate("sprites/lgtning.vmt", 1.0f);
+
+			pBeam->AddSpawnFlags(SF_BEAM_DECALS | SF_BEAM_SPARKEND);
+			//pBeam->PointsInit(vecOrigin, tr.endpos);
+			pBeam->PointEntInit(tr.endpos, this);
+			pBeam->LiveForTime(0.5f);
+			pBeam->SetColor(0, 255, 0);
+			pBeam->SetNoise(6.5f);
+			pBeam->SetBrightness(220);
+			pBeam->SetWidth(2);
+			pBeam->SetScrollRate(5);
+
+			//            ---SPECIAL---
+
+			pBeam->DoSparks(vecOrigin, tr.endpos);
+			//pBeam->DecalTrace(&tr, "BigShot");
+
+			// Light
+			CBroadcastRecipientFilter filter;
+			Vector src = tr.endpos;
+			te->DynamicLight(filter, 0.0, &src, 0, 255, 0, 5, 50, 5, 100);
+
+		}
 	}
 
-	SetContextThink( &CPropCombineBall::WhizSoundThink, gpGlobals->curtime + 2.0f * TICK_INTERVAL, s_pWhizThinkContext );
+	SetContextThink( &CPropCombineBall::WhizSoundThink, gpGlobals->curtime + 0.5f * TICK_INTERVAL, s_pWhizThinkContext );
 }
 
 //-----------------------------------------------------------------------------
@@ -1726,6 +1788,30 @@ void CPropCombineBall::VPhysicsCollision( int index, gamevcollisionevent_t *pEve
 			if ( pHitEntity && IsHittableEntity( pHitEntity ) )
 			{
 				OnHitEntity( pHitEntity, flSpeed, index, pEvent );
+
+				// Displacer stuff
+				if (m_bisFromDisplacer)
+				{
+					// Light
+					CBroadcastRecipientFilter filter;
+					Vector src = GetAbsOrigin();
+					te->DynamicLight(filter, 0.0, &src, 0, 255, 0, 5, 250, 5, 100);
+
+					CBaseEntity* pTarget = NULL;
+
+					while ((pTarget = gEntList.FindEntityInSphere(pTarget, GetAbsOrigin(), 100.0f)) != NULL)
+					{
+						if (!pTarget->IsPlayer())
+						{
+							//Msg("hit entity %s", pTarget->GetClassname());
+
+							CTakeDamageInfo info(this, GetOwnerEntity(), GetAbsVelocity(), GetAbsOrigin(), pTarget->GetMaxHealth(), DMG_DISSOLVE);
+							info.SetDamage(pTarget->GetMaxHealth());
+							info.SetDamageForce(Vector(0, 0, 100));
+							pTarget->TakeDamage(info);
+						}
+					}
+				}
 			}
 
 			// Remove self without affecting the object that was hit. (Unless it was flesh)
