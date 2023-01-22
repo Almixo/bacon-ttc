@@ -904,7 +904,7 @@ void CPropCombineBall::WhizSoundThink()
 		{
 			if (!pTarget->IsPlayer())
 			{
-				Msg("hit entity %s", pTarget->GetClassname());
+				//Msg("hit entity %s", pTarget->GetClassname());
 
 				CTakeDamageInfo info(this, GetOwnerEntity(), GetAbsVelocity(), GetAbsOrigin(), 0, DMG_DISSOLVE);
 				//info.SetDamage(0);
