@@ -1,16 +1,25 @@
 #include "cbase.h"
 #include "basehlcombatweapon.h"
 #include "player.h"
+#include "in_buttons.h"
+
+#include "rumble_shared.h"
+#include "prop_combine_ball.h"
 
 //#define MOV_BUTTONS IN_LEFT | IN_RIGHT | IN_FORWARD | IN_BACK | IN_JUMP
 
 //how much ammo we want to remove
-constexpr auto AMMOCOUNT			= 20;
+#define AMMOCOUNT_PRIMARY    3
+#define AMMOCOUNT_SECONDARY    5
 
 //bunch of macros to make the life easier, can be changed to whatever you want*
-constexpr auto ENTNAME				= "point_displace";		//name of the entity to get the key-value from!!!
-constexpr color32 FADEINCOLOUR		= { 0, 200, 0, 255 };	//fade-in colour
-constexpr auto RADIUS				= 64.0f;				//radius used in primaryattack()
+#define ENTNAME            "point_displace"                                //name of the entity to get the key-value from!!!
+#define FADEINCOLOUR    { 0, 200, 0, 255 }                                //fade-in colour
+#define RADIUS            64.0f 
+
+ConVar sk_weapon_dp_alt_fire_radius("sk_weapon_dp_alt_fire_radius", "10");
+ConVar sk_weapon_dp_alt_fire_duration("sk_weapon_dp_alt_fire_duration", "2");
+ConVar sk_weapon_dp_alt_fire_mass("sk_weapon_dp_alt_fire_mass", "150");
 
 //Displacer_sv = Displacer_serverside <3... yes I know
 class CDisplacer : public CBaseHLCombatWeapon
@@ -24,9 +33,11 @@ public:
 	CDisplacer(void);
 
 	void PrimaryAttack(void);
+	void SecondaryAttack(void);
 	bool CanHolster(void);
 	void WeaponIdle(void);
 	void ItemPostFrame(void);
+	void DelayedAttack();
 
 private:
 
@@ -34,6 +45,10 @@ private:
 
 	bool bInThink		= false;	//are we charging?
 	float fNextThink	= 0;		//when's it gonna get charged?
+
+	float					m_flDelayedFire;
+	bool					m_bShotDelayed;
+	int						m_nVentPose;
 };
 
 IMPLEMENT_SERVERCLASS_ST( CDisplacer, DT_Displacer )
@@ -59,13 +74,126 @@ CDisplacer::CDisplacer(void)
 	fNextThink			= 0;
 	pFound				= NULL;
 }
-void CDisplacer::PrimaryAttack(void)
+
+void CDisplacer::PrimaryAttack()
+{
+	if (m_bShotDelayed)
+		return;
+
+	CBasePlayer* pPlayer = ToBasePlayer(GetOwner());
+	if (pPlayer->GetAmmoCount(m_iPrimaryAmmoType) < AMMOCOUNT_PRIMARY)
+	{
+		WeaponSound(SPECIAL3);
+		pPlayer->SetNextAttack(gpGlobals->curtime + 1.5f);
+		return;
+	}
+
+	// Cannot fire underwater
+	if (GetOwner() && GetOwner()->GetWaterLevel() == 3)
+	{
+		SendWeaponAnim(ACT_VM_PRIMARYATTACK);
+		BaseClass::WeaponSound(EMPTY);
+		m_flNextSecondaryAttack = gpGlobals->curtime + 0.5f;
+		return;
+	}
+
+	m_bShotDelayed = true;
+
+	if (pPlayer)
+	{
+		pPlayer->RumbleEffect(RUMBLE_AR2_ALT_FIRE, 0, RUMBLE_FLAG_RESTART);
+#ifdef MAPBASE
+		pPlayer->SetAnimation(PLAYER_ATTACK2);
+#endif
+	}
+
+	SendWeaponAnim(ACT_VM_PRIMARYATTACK);
+	WeaponSound(SPECIAL1);
+
+	m_flNextPrimaryAttack = m_flNextSecondaryAttack = m_flDelayedFire = gpGlobals->curtime + SequenceDuration();
+	m_iSecondaryAttacks++;
+}
+
+void CDisplacer::DelayedAttack()
+{
+	m_bShotDelayed = false;
+
+	CBasePlayer* pOwner = ToBasePlayer(GetOwner());
+
+	if (pOwner == NULL)
+		return;
+
+	// Deplete the clip completely
+	SendWeaponAnim(ACT_VM_PRIMARYATTACK);
+	m_flNextSecondaryAttack = pOwner->m_flNextAttack = gpGlobals->curtime + SequenceDuration();
+
+	// Register a muzzleflash for the AI
+	pOwner->DoMuzzleFlash();
+	pOwner->SetMuzzleFlashTime(gpGlobals->curtime + 0.5);
+
+	WeaponSound(WPN_DOUBLE);
+
+	pOwner->RumbleEffect(RUMBLE_SHOTGUN_DOUBLE, 0, RUMBLE_FLAG_RESTART);
+
+	// Fire the bullets
+	Vector vecSrc = pOwner->Weapon_ShootPosition();
+	Vector vecAiming = pOwner->GetAutoaimVector(AUTOAIM_SCALE_DEFAULT);
+	Vector impactPoint = vecSrc + (vecAiming * MAX_TRACE_LENGTH);
+
+	// Fire the bullets
+	Vector vecVelocity = vecAiming * 1000.0f;
+
+	// Fire the combine ball
+	auto pBalls = CreateCombineBall(vecSrc,
+		vecVelocity,
+		sk_weapon_dp_alt_fire_radius.GetFloat(),
+		sk_weapon_dp_alt_fire_mass.GetFloat(),
+		sk_weapon_dp_alt_fire_duration.GetFloat(),
+		pOwner);
+
+	if (pBalls)
+	{
+		auto pBallsReal = static_cast<CPropCombineBall*>(pBalls);
+		if (pBallsReal)
+		{
+			pBallsReal->SetMaxBounces(-1);
+			pBallsReal->SetModelScale(20);
+			pBallsReal->SetIsFromDisplacer(true);
+		}
+	}
+
+	// View effects
+	color32 white = { 255, 255, 255, 64 };
+	UTIL_ScreenFade(pOwner, white, 0.1, 0, FFADE_IN);
+
+	//Disorient the player
+	QAngle angles = pOwner->GetLocalAngles();
+
+	angles.x += random->RandomInt(-4, 4);
+	angles.y += random->RandomInt(-4, 4);
+	angles.z = 0;
+
+	pOwner->SnapEyeAngles(angles);
+
+	pOwner->ViewPunch(QAngle(random->RandomInt(-8, -12), random->RandomInt(1, 2), 0));
+
+	// Decrease ammo
+	pOwner->RemoveAmmo(AMMOCOUNT_PRIMARY, m_iPrimaryAmmoType);
+
+	// Can shoot again immediately
+	m_flNextPrimaryAttack = gpGlobals->curtime + 0.5f;
+
+	// Can blow up after a short delay (so have time to release mouse button)
+	m_flNextSecondaryAttack = gpGlobals->curtime + 1.0f;
+}
+
+void CDisplacer::SecondaryAttack(void)
 {
 	CBasePlayer *pPlayer = ToBasePlayer(GetOwner());
 
 	if (!pPlayer) return;
 
-	if (pPlayer->GetAmmoCount(m_iPrimaryAmmoType) <= 20 )
+	if (pPlayer->GetAmmoCount(m_iPrimaryAmmoType) < AMMOCOUNT_SECONDARY)
 	{
 		WeaponSound(SPECIAL3);
 		pPlayer->SetNextAttack(gpGlobals->curtime + 1.5f);
@@ -81,7 +209,7 @@ void CDisplacer::PrimaryAttack(void)
 
 		DevWarning("waiting for itempostframe()!\n");	//spews an error in console, can be removed
 
-		pPlayer->RemoveAmmo(AMMOCOUNT, m_iPrimaryAmmoType);
+		pPlayer->RemoveAmmo(AMMOCOUNT_SECONDARY, m_iPrimaryAmmoType);
 
 		fNextThink = gpGlobals->curtime + 1.25f; //nextthink for when the charging starts
 
@@ -90,7 +218,7 @@ void CDisplacer::PrimaryAttack(void)
 		SendWeaponAnim(ACT_VM_PRIMARYATTACK);
 		WeaponSound(SPECIAL1);
 
-		m_flNextPrimaryAttack = gpGlobals->curtime + 3.0f;
+		m_flNextPrimaryAttack = m_flNextSecondaryAttack = gpGlobals->curtime + SequenceDuration();
 		return;
 	}
 
@@ -107,6 +235,12 @@ bool CDisplacer::CanHolster(void)
 void CDisplacer::ItemPostFrame(void)
 {
 	BaseClass::ItemPostFrame();
+
+	// See if we need to fire off our secondary round
+	if (m_bShotDelayed && gpGlobals->curtime > m_flDelayedFire)
+	{
+		DelayedAttack();
+	}
 
 	if (bInThink) //should we be charging?
 	{

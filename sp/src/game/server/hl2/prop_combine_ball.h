@@ -116,6 +116,21 @@ public:
 		m_bEmit = bEmit;
 	}
 
+	void SetDamageScale(float flScale)
+	{
+		m_flDamageScale = flScale;
+	}
+
+	void SetIsFromDisplacer(bool bState)
+	{
+		m_bisFromDisplacer = bState;
+	}
+
+	bool GetIsFromDisplacer()
+	{
+		return m_bisFromDisplacer;
+	}
+
 	void SetOriginalOwner( CBaseEntity *pEntity ) { m_hOriginalOwner = pEntity; }
 	CBaseEntity *GetOriginalOwner() { return m_hOriginalOwner; }
 
@@ -188,6 +203,14 @@ private:
 
 	float	m_flNextDamageTime;
 	float	m_flLastCaptureTime;
+
+	// displacer stuff
+	float	m_flDamageScale;
+	bool	m_bisFromDisplacer;
+	short iBeamCount = 0;
+	short iMaxBeam = 20;
+	float	m_flNextBeamSpawn;
+	float	m_flWhizSoundUpdate;
 
 	CHandle < CFuncCombineBallSpawner > m_hSpawner;
 
