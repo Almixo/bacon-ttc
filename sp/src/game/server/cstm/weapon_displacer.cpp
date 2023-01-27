@@ -266,23 +266,23 @@ void CDisplacer::DelayedAttack(void)
 			{
 				DevWarning("Invalid entity!\n");
 
-				bInThink = false; //stop thinking!
+			bInThink = false; //stop thinking!
 
-				return;
-			}
+			return;
+		}
 
-			CBasePlayer *pPlayer = ToBasePlayer(GetOwner());
+		CBasePlayer *pPlayer = ToBasePlayer(GetOwner());
 
 			pPlayer->SetAbsOrigin(ptemp->GetAbsOrigin() - Vector(0.0f, 0.0f, 16.0f)); //push the player a bit downwards...
 
-			pPlayer->SetAbsVelocity(Vector(0, 0, 0));
-			pPlayer->SetAbsAngles(QAngle(0, 0, 0));
+		pPlayer->SetAbsVelocity(Vector(0, 0, 0));
+		pPlayer->SetAbsAngles(QAngle(0, 0, 0));
 
 			WeaponSound(AFTERCHRG);
 
-			UTIL_ScreenFade(pPlayer, FADEINCOLOUR, 0.5f, 0.1f, FFADE_IN);
+		UTIL_ScreenFade(pPlayer, FADEINCOLOUR, 0.5f, 0.1f, FFADE_IN);
 
-			pPlayer->SetMoveType(MOVETYPE_WALK); //reset player's movement to default
+		pPlayer->SetMoveType(MOVETYPE_WALK); //reset player's movement to default
 
 			bInThink = false;
 
