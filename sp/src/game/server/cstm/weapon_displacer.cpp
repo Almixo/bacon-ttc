@@ -6,22 +6,30 @@
 #include "rumble_shared.h"
 #include "prop_combine_ball.h"
 
-//#define MOV_BUTTONS IN_LEFT | IN_RIGHT | IN_FORWARD | IN_BACK | IN_JUMP
-
 //how much ammo we want to remove
-#define AMMOCOUNT_PRIMARY    3
-#define AMMOCOUNT_SECONDARY    5
+constexpr int AMMOCOUNT_PRIMARY			= 3;
+constexpr int AMMOCOUNT_SECONDARY		= 5;
 
 //bunch of macros to make the life easier, can be changed to whatever you want*
-#define ENTNAME            "point_displace"                                //name of the entity to get the key-value from!!!
-#define FADEINCOLOUR    { 0, 200, 0, 255 }                                //fade-in colour
-#define RADIUS            64.0f 
+constexpr auto			ENTNAME			= "point_displace";									//name of the entity to get the key-value from!!!
+constexpr color32		FADEINCOLOUR	= { 0, 200, 0, 255 };								//fade-in colour
+constexpr float			RADIUS			= 64.0f;											//search radius
+
+constexpr auto CHARGEUP					= SPECIAL1;
+constexpr auto BALLER					= WPN_DOUBLE;
+constexpr auto AFTERCHRG				= SPECIAL2;
+constexpr auto DENY						= SPECIAL3;
 
 ConVar sk_weapon_dp_alt_fire_radius("sk_weapon_dp_alt_fire_radius", "10");
 ConVar sk_weapon_dp_alt_fire_duration("sk_weapon_dp_alt_fire_duration", "2");
 ConVar sk_weapon_dp_alt_fire_mass("sk_weapon_dp_alt_fire_mass", "150");
 
-//Displacer_sv = Displacer_serverside <3... yes I know
+enum
+{
+	PRIMARY = 1,
+	SECONDARY,
+};
+
 class CDisplacer : public CBaseHLCombatWeapon
 {
 	DECLARE_CLASS( CDisplacer, CBaseHLCombatWeapon );
@@ -37,18 +45,15 @@ public:
 	bool CanHolster(void);
 	void WeaponIdle(void);
 	void ItemPostFrame(void);
-	void DelayedAttack();
+	void DelayedAttack(void); //1 for primary, 2 for secondary
 
 private:
 
-	CBaseEntity* pFound;			// base-entity-point pointer, working with it throughout the code
+	CBaseEntity* pFound;				// base-entity-point pointer, working with it throughout the code
 
-	bool bInThink		= false;	//are we charging?
-	float fNextThink	= 0;		//when's it gonna get charged?
-
-	float					m_flDelayedFire;
-	bool					m_bShotDelayed;
-	int						m_nVentPose;
+	bool	bInThink		= false;	//are we charging?
+	float	fNextThink		= 0;		//when's it gonna get charged?
+	int		iModeSwitch		= 0;		//1 for primary, 2 for secondary
 };
 
 IMPLEMENT_SERVERCLASS_ST( CDisplacer, DT_Displacer )
@@ -64,200 +69,199 @@ BEGIN_DATADESC( CDisplacer )
 DEFINE_FIELD(pFound, FIELD_CLASSPTR),
 DEFINE_FIELD(bInThink, FIELD_BOOLEAN),
 DEFINE_FIELD(fNextThink, FIELD_FLOAT),
+DEFINE_FIELD(iModeSwitch, FIELD_INTEGER)
 END_DATADESC();
 
 CDisplacer::CDisplacer(void)
 {
 	m_bReloadsSingly	= false;
-	m_bFiresUnderwater	= false;	
+	m_bFiresUnderwater	= false;
 
+	pFound				= 0;
+	bInThink			= false;
 	fNextThink			= 0;
-	pFound				= NULL;
-}
-
-void CDisplacer::PrimaryAttack()
-{
-	if (m_bShotDelayed)
-		return;
-
-	CBasePlayer* pPlayer = ToBasePlayer(GetOwner());
-	if (pPlayer->GetAmmoCount(m_iPrimaryAmmoType) < AMMOCOUNT_PRIMARY)
-	{
-		WeaponSound(SPECIAL3);
-		pPlayer->SetNextAttack(gpGlobals->curtime + 1.5f);
-		return;
-	}
-
-	// Cannot fire underwater
-	if (GetOwner() && GetOwner()->GetWaterLevel() == 3)
-	{
-		SendWeaponAnim(ACT_VM_PRIMARYATTACK);
-		BaseClass::WeaponSound(EMPTY);
-		m_flNextSecondaryAttack = gpGlobals->curtime + 0.5f;
-		return;
-	}
-
-	m_bShotDelayed = true;
-
-	if (pPlayer)
-	{
-		pPlayer->RumbleEffect(RUMBLE_AR2_ALT_FIRE, 0, RUMBLE_FLAG_RESTART);
-#ifdef MAPBASE
-		pPlayer->SetAnimation(PLAYER_ATTACK2);
-#endif
-	}
-
-	SendWeaponAnim(ACT_VM_PRIMARYATTACK);
-	WeaponSound(SPECIAL1);
-
-	m_flNextPrimaryAttack = m_flNextSecondaryAttack = m_flDelayedFire = gpGlobals->curtime + SequenceDuration();
-	m_iSecondaryAttacks++;
-}
-
-void CDisplacer::DelayedAttack()
-{
-	m_bShotDelayed = false;
-
-	CBasePlayer* pOwner = ToBasePlayer(GetOwner());
-
-	if (pOwner == NULL)
-		return;
-
-	// Deplete the clip completely
-	SendWeaponAnim(ACT_VM_PRIMARYATTACK);
-	m_flNextSecondaryAttack = pOwner->m_flNextAttack = gpGlobals->curtime + SequenceDuration();
-
-	// Register a muzzleflash for the AI
-	pOwner->DoMuzzleFlash();
-	pOwner->SetMuzzleFlashTime(gpGlobals->curtime + 0.5);
-
-	WeaponSound(WPN_DOUBLE);
-
-	pOwner->RumbleEffect(RUMBLE_SHOTGUN_DOUBLE, 0, RUMBLE_FLAG_RESTART);
-
-	// Fire the bullets
-	Vector vecSrc = pOwner->Weapon_ShootPosition();
-	Vector vecAiming = pOwner->GetAutoaimVector(AUTOAIM_SCALE_DEFAULT);
-	Vector impactPoint = vecSrc + (vecAiming * MAX_TRACE_LENGTH);
-
-	// Fire the bullets
-	Vector vecVelocity = vecAiming * 1000.0f;
-
-	// Fire the combine ball
-	auto pBalls = CreateCombineBall(vecSrc,
-		vecVelocity,
-		sk_weapon_dp_alt_fire_radius.GetFloat(),
-		sk_weapon_dp_alt_fire_mass.GetFloat(),
-		sk_weapon_dp_alt_fire_duration.GetFloat(),
-		pOwner);
-
-	if (pBalls)
-	{
-		auto pBallsReal = static_cast<CPropCombineBall*>(pBalls);
-		if (pBallsReal)
-		{
-			pBallsReal->SetMaxBounces(-1);
-			pBallsReal->SetModelScale(20);
-			pBallsReal->SetIsFromDisplacer(true);
-		}
-	}
-
-	// View effects
-	color32 white = { 255, 255, 255, 64 };
-	UTIL_ScreenFade(pOwner, white, 0.1, 0, FFADE_IN);
-
-	//Disorient the player
-	QAngle angles = pOwner->GetLocalAngles();
-
-	angles.x += random->RandomInt(-4, 4);
-	angles.y += random->RandomInt(-4, 4);
-	angles.z = 0;
-
-	pOwner->SnapEyeAngles(angles);
-
-	pOwner->ViewPunch(QAngle(random->RandomInt(-8, -12), random->RandomInt(1, 2), 0));
-
-	// Decrease ammo
-	pOwner->RemoveAmmo(AMMOCOUNT_PRIMARY, m_iPrimaryAmmoType);
-
-	// Can shoot again immediately
-	m_flNextPrimaryAttack = gpGlobals->curtime + 0.5f;
-
-	// Can blow up after a short delay (so have time to release mouse button)
-	m_flNextSecondaryAttack = gpGlobals->curtime + 1.0f;
+	iModeSwitch			= 0;
 }
 
 void CDisplacer::SecondaryAttack(void)
 {
+	if (bInThink)
+		return;
+
+	CBasePlayer *pOwner = ToBasePlayer(GetOwner());
+
+	if (!pOwner)
+		return;
+
+	if (pOwner->GetAmmoCount(m_iPrimaryAmmoType) < AMMOCOUNT_SECONDARY)
+	{
+		WeaponSound(DENY);
+		pOwner->SetNextAttack(gpGlobals->curtime + 1.5f);
+
+		return;
+	}
+
+	auto pEnt = gEntList.FindEntityByClassnameNearest(ENTNAME, pOwner->GetAbsOrigin(), RADIUS); //find our entity in a 64 unit radius
+	if (!pEnt)
+	{
+		WeaponSound(DENY);
+		pOwner->SetNextAttack(gpGlobals->curtime + 1.5f);
+
+		return;
+	}
+
+	pOwner->RemoveAmmo(AMMOCOUNT_PRIMARY, m_iPrimaryAmmoType);
+	pOwner->SetMoveType(MOVETYPE_NONE);
+
+	SendWeaponAnim(ACT_VM_PRIMARYATTACK);
+	WeaponSound(CHARGEUP);
+
+	fNextThink	= gpGlobals->curtime + 1.5f; //schedule teleport
+
+	pFound		= pEnt;			//assign a pointer to it
+
+	iModeSwitch = SECONDARY;	//set our mode to secondary attack
+
+	bInThink	= true;			//thinking!
+
+	//pOwner->SetNextAttack() breaks the thinking logic?!
+	m_flNextSecondaryAttack = gpGlobals->curtime + 3.0f;
+	m_flNextPrimaryAttack	= gpGlobals->curtime + 3.0f;
+}
+
+void CDisplacer::PrimaryAttack(void)
+{
+	if (bInThink)
+		return;
+
 	CBasePlayer *pPlayer = ToBasePlayer(GetOwner());
 
-	if (!pPlayer) return;
+	if (!pPlayer)
+		return;
 
-	if (pPlayer->GetAmmoCount(m_iPrimaryAmmoType) < AMMOCOUNT_SECONDARY)
+	if (pPlayer->GetAmmoCount(m_iPrimaryAmmoType) < AMMOCOUNT_PRIMARY)
 	{
-		WeaponSound(SPECIAL3);
+		WeaponSound(DENY);
 		pPlayer->SetNextAttack(gpGlobals->curtime + 1.5f);
 		return;
 	}
 
-	auto pEnt = gEntList.FindEntityByClassnameNearest(ENTNAME, pPlayer->GetAbsOrigin(), RADIUS);	//trying to find "point_displace" in 64 unit radius
-	if (pEnt && !bInThink)
-	{
-		pFound = pEnt; //assign point_displace-or-whatever pointer
+	pPlayer->RumbleEffect(RUMBLE_AR2_ALT_FIRE, 0, RUMBLE_FLAG_RESTART);
+#ifdef MAPBASE
+	pPlayer->SetAnimation(PLAYER_ATTACK2);
+#endif
 
-		bInThink = true; //we don't want to switch current weapon now, do we?
+	SendWeaponAnim(ACT_VM_PRIMARYATTACK);
+	WeaponSound(CHARGEUP);
 
-		DevWarning("waiting for itempostframe()!\n");	//spews an error in console, can be removed
+	// Decrease ammo
+	pPlayer->RemoveAmmo(AMMOCOUNT_PRIMARY, m_iPrimaryAmmoType);
 
-		pPlayer->RemoveAmmo(AMMOCOUNT_SECONDARY, m_iPrimaryAmmoType);
+	fNextThink	= gpGlobals->curtime + SequenceDuration(); //schedule ball firing
 
-		fNextThink = gpGlobals->curtime + 1.25f; //nextthink for when the charging starts
+	iModeSwitch = PRIMARY;		//set our mode to primary attack
 
-		pPlayer->SetMoveType(MOVETYPE_FLYGRAVITY);	//hack to freeze player movement!
+	bInThink	= true;			//thinking!
 
-		SendWeaponAnim(ACT_VM_PRIMARYATTACK);
-		WeaponSound(SPECIAL1);
-
-		m_flNextPrimaryAttack = m_flNextSecondaryAttack = gpGlobals->curtime + SequenceDuration();
-		return;
-	}
-
-	WeaponSound(SPECIAL3);
-	pPlayer->m_flNextAttack = gpGlobals->curtime + 1.5f;
+	pPlayer->SetNextAttack(gpGlobals->curtime + SequenceDuration());
 }
-bool CDisplacer::CanHolster(void)
-{
-	if (bInThink)
-		return FALSE; //we don't want the player to switch weapons while charging!
 
-	return BaseClass::CanHolster(); //otherwise default behavior
-}
 void CDisplacer::ItemPostFrame(void)
 {
 	BaseClass::ItemPostFrame();
 
-	// See if we need to fire off our secondary round
-	if (m_bShotDelayed && gpGlobals->curtime > m_flDelayedFire)
+	if (bInThink && fNextThink < gpGlobals->curtime)
 	{
 		DelayedAttack();
 	}
-
-	if (bInThink) //should we be charging?
+}
+void CDisplacer::DelayedAttack(void)
+{
+	switch (iModeSwitch)
 	{
-		if (fNextThink < gpGlobals->curtime) //check if some time has passed
+		case PRIMARY:
+		{
+			CBasePlayer *pOwner = ToBasePlayer(GetOwner());
+
+			if (!pOwner)
+				return;
+
+			// Deplete the clip completely
+			SendWeaponAnim(ACT_VM_PRIMARYATTACK);
+
+			// Register a muzzleflash for the AI
+			pOwner->DoMuzzleFlash();
+			pOwner->SetMuzzleFlashTime(gpGlobals->curtime + 0.5);
+
+			WeaponSound(BALLER);
+
+			pOwner->RumbleEffect(RUMBLE_SHOTGUN_DOUBLE, 0, RUMBLE_FLAG_RESTART);
+
+			// Fire the bullets
+			Vector vecSrc = pOwner->Weapon_ShootPosition();
+			Vector vecAiming = pOwner->GetAutoaimVector(AUTOAIM_SCALE_DEFAULT);
+			Vector impactPoint = vecSrc + (vecAiming * MAX_TRACE_LENGTH);
+
+			// Fire the bullets
+			Vector vecVelocity = vecAiming * 1000.0f;
+
+			// Fire the combine ball
+			auto pBalls = CreateCombineBall(vecSrc,
+				vecVelocity,
+				sk_weapon_dp_alt_fire_radius.GetFloat(),
+				sk_weapon_dp_alt_fire_mass.GetFloat(),
+				sk_weapon_dp_alt_fire_duration.GetFloat(),
+				pOwner);
+
+			if (pBalls)
+			{
+				auto pBallsReal = static_cast<CPropCombineBall*>(pBalls);
+				if (pBallsReal)
+				{
+					pBallsReal->SetMaxBounces(-1);
+					pBallsReal->SetModelScale(20);
+					pBallsReal->SetIsFromDisplacer(true);
+				}
+			}
+
+			// View effects
+			color32 white = { 255, 255, 255, 64 };
+			UTIL_ScreenFade(pOwner, white, 0.1, 0, FFADE_IN);
+
+			//Disorient the player
+			QAngle angles = pOwner->GetLocalAngles();
+
+			angles.x += random->RandomFloat(-4, 4);
+			angles.y += random->RandomFloat(-4, 4);
+			angles.z = 0;
+
+			pOwner->SnapEyeAngles(angles);
+
+			pOwner->ViewPunch(QAngle(RandomInt(-8, -12), RandomInt(1, 2), 0));
+
+			// Can shoot again immediately
+			pOwner->SetNextAttack(gpGlobals->curtime + 1.0f);
+
+			bInThink = false;
+
+			fNextThink	= 0;
+			iModeSwitch = 0;
+
+			break;
+		}
+		case SECONDARY:
 		{
 			variant_t temp;
 
-			pFound->ReadKeyField("target", &temp); //much better, doesn't care about entity's name as long as it has its pointer
+			pFound->ReadKeyField("target", &temp);
 
-			const char *keyval = temp.String(); //maybe make it constn't?
-//			^^^ finally, no more depression from GetKeyValue()!
+			auto keyval = temp.String();
 
-			DevWarning("The entity name is %s.\n", pFound->GetDebugName()); //spews warning into console, can be removed
+			DevWarning("The entity name is %s.\n", pFound->GetDebugName());
 
-			DevWarning("keyval is %s.\n", keyval); //spews warning into console, can be removed
+			DevWarning("keyval is %s.\n", keyval);
 
-			auto ptemp = gEntList.FindEntityByName(NULL, keyval); //trying to find the last entity e.g. the entity to teleport to.
+			auto ptemp = gEntList.FindEntityByName(NULL, keyval);
 			if (!ptemp)
 			{
 				DevWarning("Invalid entity!\n");
@@ -270,24 +274,35 @@ void CDisplacer::ItemPostFrame(void)
 			CBasePlayer *pPlayer = ToBasePlayer(GetOwner());
 
 			pPlayer->SetAbsOrigin(ptemp->GetAbsOrigin() - Vector(0.0f, 0.0f, 16.0f)); //push the player a bit downwards...
-			pPlayer->SetAbsAngles(ptemp->GetAbsAngles()); //doesn't seem to work, wtf?
 
 			pPlayer->SetAbsVelocity(Vector(0, 0, 0));
 			pPlayer->SetAbsAngles(QAngle(0, 0, 0));
 
-			WeaponSound(SPECIAL2);
+			WeaponSound(AFTERCHRG);
 
 			UTIL_ScreenFade(pPlayer, FADEINCOLOUR, 0.5f, 0.1f, FFADE_IN);
 
 			pPlayer->SetMoveType(MOVETYPE_WALK); //reset player's movement to default
 
-			DevWarning("itempostframe() portion done!\n"); //spews error in the console, can be removed
+			bInThink = false;
 
-			bInThink = false; //stop thinking!
+			fNextThink	= 0;
+			iModeSwitch = 0;
+
+			break;
 		}
 	}
 }
-void CDisplacer::WeaponIdle(void) //made it so it ain't crap
+
+bool CDisplacer::CanHolster(void)
+{
+	if (bInThink)
+		return false;
+
+	return BaseClass::CanHolster();
+}
+
+void CDisplacer::WeaponIdle(void)
 {
 	if (HasWeaponIdleTimeElapsed() && !bInThink)
 	{
