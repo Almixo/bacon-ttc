@@ -69,7 +69,7 @@ BEGIN_DATADESC( CDisplacer )
 DEFINE_FIELD(pFound, FIELD_CLASSPTR),
 DEFINE_FIELD(bInThink, FIELD_BOOLEAN),
 DEFINE_FIELD(fNextThink, FIELD_FLOAT),
-DEFINE_FIELD(iModeSwitch, FIELD_INTEGER)
+DEFINE_FIELD(iModeSwitch, FIELD_INTEGER),
 END_DATADESC();
 
 CDisplacer::CDisplacer(void)
@@ -111,7 +111,7 @@ void CDisplacer::SecondaryAttack(void)
 	}
 
 	pOwner->RemoveAmmo(AMMOCOUNT_PRIMARY, m_iPrimaryAmmoType);
-	pOwner->SetMoveType(MOVETYPE_NONE);
+	pOwner->AddFlag( FL_FROZEN | FL_ATCONTROLS ); //disable player's movement
 
 	SendWeaponAnim(ACT_VM_PRIMARYATTACK);
 	WeaponSound(CHARGEUP);
@@ -285,7 +285,7 @@ void CDisplacer::DelayedAttack(void)
 
 			UTIL_ScreenFade(pPlayer, FADEINCOLOUR, 0.5f, 0.1f, FFADE_IN);
 
-			pPlayer->SetMoveType(MOVETYPE_WALK); //reset player's movement to default
+			pPlayer->RemoveFlag( FL_FROZEN | FL_ATCONTROLS);						//reset back player's movement
 
 			bInThink = false;
 
