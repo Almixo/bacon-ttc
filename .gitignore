@@ -161,3 +161,4 @@ mp/src/vpc_scripts/newer_vs_toolsets.vpc
 
 # Extra
 .vs
+C++.gitignore
