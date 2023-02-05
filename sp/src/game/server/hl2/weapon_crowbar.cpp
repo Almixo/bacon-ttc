@@ -253,7 +253,7 @@ void CWeaponCrowbar::ItemPostFrame()
 		return;
 
 	// player pressed the button, start charging...
-	if ((pPlayer->m_nButtons & IN_ATTACK2) && m_iCrowbarStage == 0 && m_flStageUpdate < gpGlobals->curtime)
+	if ((pPlayer->m_nButtons & IN_ATTACK2) && m_iCrowbarStage == 0 && m_flStageUpdate < gpGlobals->curtime && m_flNextSecondaryAttack < gpGlobals->curtime)
 	{
 		m_iCrowbarStage = 1;
 		m_flHoldMultiplier = 1.0f;
@@ -280,7 +280,7 @@ void CWeaponCrowbar::ItemPostFrame()
 	{
 		m_iCrowbarStage = 0;
 		Swing(true);
-		m_flNextPrimaryAttack = m_flNextSecondaryAttack = gpGlobals->curtime + 0.5f;
+		m_flNextPrimaryAttack = m_flNextSecondaryAttack = gpGlobals->curtime + GetFireRate();
 	}
 
 }
@@ -303,7 +303,7 @@ void CWeaponCrowbar::Swing(int bIsSecondary)
 
 	Vector swingEnd = swingStart + forward * (WRENCH_RANGE_PRIMARY + m_flHoldRange);
 	UTIL_TraceLine(swingStart, swingEnd, MASK_SHOT_HULL, pOwner, COLLISION_GROUP_NONE, &traceHit);
-	Activity nHitActivity = bIsSecondary ? ACT_VM_HITCENTER : ACT_VM_SWINGHARD;
+	Activity nHitActivity = bIsSecondary ? ACT_VM_SWINGHARD : ACT_VM_HITCENTER;
 
 	// Like bullets, bludgeon traces have to trace against triggers.
 	CTakeDamageInfo triggerInfo(GetOwner(), GetOwner(), GetDamageForActivity(nHitActivity), DMG_CLUB);
@@ -356,7 +356,7 @@ void CWeaponCrowbar::Swing(int bIsSecondary)
 	// -------------------------
 	if (traceHit.fraction == 1.0f)
 	{
-		nHitActivity = bIsSecondary ? ACT_VM_MISSCENTER : ACT_VM_MISSRIGHT2;
+		nHitActivity = bIsSecondary ? ACT_VM_MISSRIGHT2 : ACT_VM_MISSCENTER;
 
 		// We want to test the first swing again
 		Vector testEnd = swingStart + forward * GetRange();
@@ -388,8 +388,10 @@ void CWeaponCrowbar::Swing(int bIsSecondary)
 	SendWeaponAnim(nHitActivity);
 
 	//Setup our next attack times
-	m_flNextPrimaryAttack = gpGlobals->curtime + GetFireRate();
-	m_flNextSecondaryAttack = gpGlobals->curtime + SequenceDuration();
+//	m_flNextPrimaryAttack = gpGlobals->curtime + GetFireRate();
+//	m_flNextSecondaryAttack = gpGlobals->curtime + ( SequenceDuration() + GetFireRate() );
+
+	m_flNextPrimaryAttack = m_flNextSecondaryAttack = gpGlobals->curtime + GetFireRate();
 
 #ifndef MAPBASE
 	//Play swing sound
