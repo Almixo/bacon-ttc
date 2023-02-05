@@ -7,21 +7,21 @@
 constexpr auto ATTCKMISS	= "XenTree.AttackMiss";
 constexpr auto ATTCKHIT		= "XenTree.AttackHit";
 
-class CActAnimating : public CBaseAnimating
-{
-public:
-	DECLARE_CLASS( CActAnimating, CBaseAnimating );
+BEGIN_DATADESC( CActAnimating )
+	DEFINE_CUSTOM_FIELD( m_Activity, ActivityDataOps() ),
+END_DATADESC()
 
-	void			SetActivity( Activity act );
-	inline Activity	GetActivity( void ) { return m_Activity; }
 
-	virtual int	ObjectCaps( void ) { return BaseClass::ObjectCaps() & ~FCAP_ACROSS_TRANSITION; }
-
-	DECLARE_DATADESC();
-
-private:
-	Activity	m_Activity;
-};
+void CActAnimating::SetActivity( Activity act ) 
+{ 
+	int sequence = SelectWeightedSequence( act ); 
+	if ( sequence != ACTIVITY_NOT_AVAILABLE )
+	{
+		ResetSequence( sequence );
+		m_Activity = act; 
+		SetCycle( 0 );
+	}
+}
 
 class CXenTreeTrigger : public CBaseEntity
 {

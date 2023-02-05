@@ -164,6 +164,8 @@ void CDisplacer::PrimaryAttack(void)
 	bInThink	= true;			//thinking!
 
 	pPlayer->SetNextAttack(gpGlobals->curtime + SequenceDuration());
+
+	DoMuzzleFlash();
 }
 
 void CDisplacer::ItemPostFrame(void)
