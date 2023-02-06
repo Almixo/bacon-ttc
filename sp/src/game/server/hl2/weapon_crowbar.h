@@ -60,6 +60,18 @@ public:
 	float		m_flHoldMultiplier;
 	float		m_flHoldRange;
 
+	float		m_bIsAttacking = false;
+	float		m_flDelayedAttack = 0;
+
+	struct something {
+		trace_t		tHit;
+		Activity	aHitAct;
+		bool		bIsSec;
+		
+	};
+
+	something shit;
+
 #ifdef MAPBASE
 	// Don't use backup activities
 	acttable_t		*GetBackupActivityList() { return NULL; }

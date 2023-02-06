@@ -247,9 +247,9 @@ void CWeaponCrowbar::ItemPostFrame()
 {
 	BaseClass::ItemPostFrame(); // call the original
 
-	CBasePlayer* pPlayer = ToBasePlayer(GetOwner());
+	CBasePlayer *pPlayer = ToBasePlayer(GetOwner());
 
-	if (pPlayer == NULL)
+	if (!pPlayer)
 		return;
 
 	// player pressed the button, start charging...
@@ -283,6 +283,13 @@ void CWeaponCrowbar::ItemPostFrame()
 		m_flNextPrimaryAttack = m_flNextSecondaryAttack = gpGlobals->curtime + GetFireRate();
 	}
 
+	if (m_bIsAttacking && m_flDelayedAttack < gpGlobals->curtime)
+	{
+		Hit(shit.tHit, shit.aHitAct, shit.bIsSec);
+		m_flDelayedAttack = 0;
+		m_bIsAttacking = false;
+	}
+
 }
 
 void CWeaponCrowbar::Swing(int bIsSecondary)
@@ -290,7 +297,7 @@ void CWeaponCrowbar::Swing(int bIsSecondary)
 	trace_t traceHit;
 
 	// Try a ray
-	CBasePlayer* pOwner = ToBasePlayer(GetOwner());
+	CBasePlayer *pOwner = ToBasePlayer(GetOwner());
 	if (!pOwner)
 		return;
 
@@ -381,16 +388,18 @@ void CWeaponCrowbar::Swing(int bIsSecondary)
 			WeaponSound(MELEE_HIT);
 #endif
 
-		Hit(traceHit, nHitActivity, bIsSecondary ? true : false);
+		shit.tHit			= traceHit;
+		shit.aHitAct		= nHitActivity;
+		shit.bIsSec			= bIsSecondary ? true : false;
+
+		m_bIsAttacking		= true;
+		m_flDelayedAttack	= bIsSecondary ? gpGlobals->curtime + 0.15f : gpGlobals->curtime + 0.05f;
 	}
 
 	// Send the anim
 	SendWeaponAnim(nHitActivity);
 
 	//Setup our next attack times
-//	m_flNextPrimaryAttack = gpGlobals->curtime + GetFireRate();
-//	m_flNextSecondaryAttack = gpGlobals->curtime + ( SequenceDuration() + GetFireRate() );
-
 	m_flNextPrimaryAttack = m_flNextSecondaryAttack = gpGlobals->curtime + GetFireRate();
 
 #ifndef MAPBASE
@@ -408,7 +417,9 @@ void CWeaponCrowbar::Swing(int bIsSecondary)
 //------------------------------------------------------------------------------
 void CWeaponCrowbar::Hit(trace_t& traceHit, Activity nHitActivity, bool bIsSecondary)
 {
-	CBasePlayer* pPlayer = ToBasePlayer(GetOwner());
+	CBasePlayer *pPlayer = ToBasePlayer(GetOwner());
+	if (!pPlayer)
+		return;
 
 	//Do view kick
 	AddViewKick();
