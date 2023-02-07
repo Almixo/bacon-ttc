@@ -19,7 +19,7 @@
 #endif
 
 #define	CROWBAR_RANGE	75.0f
-#define	CROWBAR_REFIRE	0.4f
+#define	CROWBAR_REFIRE	0.75f //0.4f default
 #define WRENCH_RANGE_PRIMARY 90.0f
 #define WRENCH_RANGE_SECONDARY 120.0f
 
@@ -59,6 +59,18 @@ public:
 	float		m_flHoldUpdate;
 	float		m_flHoldMultiplier;
 	float		m_flHoldRange;
+
+	float		m_bIsAttacking = false;
+	float		m_flDelayedAttack = 0;
+
+	struct something {
+		trace_t		tHit;
+		Activity	aHitAct;
+		bool		bIsSec;
+		
+	};
+
+	something shit;
 
 #ifdef MAPBASE
 	// Don't use backup activities
