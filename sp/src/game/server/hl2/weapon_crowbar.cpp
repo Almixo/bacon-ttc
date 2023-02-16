@@ -103,7 +103,7 @@ void CWeaponCrowbar::AddViewKick( void )
 {
 	CBasePlayer *pPlayer  = ToBasePlayer( GetOwner() );
 	
-	if ( pPlayer == NULL )
+	if ( !pPlayer )
 		return;
 
 	QAngle punchAng;
@@ -415,7 +415,7 @@ void CWeaponCrowbar::Swing(int bIsSecondary)
 //------------------------------------------------------------------------------
 // Purpose: Implement impact function
 //------------------------------------------------------------------------------
-void CWeaponCrowbar::Hit(trace_t& traceHit, Activity nHitActivity, bool bIsSecondary)
+void CWeaponCrowbar::Hit(trace_t &traceHit, Activity nHitActivity, bool bIsSecondary)
 {
 	CBasePlayer *pPlayer = ToBasePlayer(GetOwner());
 	if (!pPlayer)
@@ -430,7 +430,7 @@ void CWeaponCrowbar::Hit(trace_t& traceHit, Activity nHitActivity, bool bIsSecon
 	// This isn't great, but it's something for when the crowbar hits.
 	pPlayer->RumbleEffect(RUMBLE_AR2, 0, RUMBLE_FLAG_RESTART);
 
-	CBaseEntity* pHitEntity = traceHit.m_pEnt;
+	CBaseEntity *pHitEntity = traceHit.m_pEnt;
 
 	//Apply damage to a hit target
 	if (pHitEntity != NULL)
