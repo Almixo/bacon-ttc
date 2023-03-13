@@ -378,16 +378,6 @@ void CWeaponCrowbar::Swing(int bIsSecondary)
 	}
 	else
 	{
-#ifdef MAPBASE
-		// Other melee sounds
-		if (traceHit.m_pEnt && traceHit.m_pEnt->IsWorld())
-			WeaponSound(MELEE_HIT_WORLD);
-		else if (traceHit.m_pEnt && !traceHit.m_pEnt->PassesDamageFilter(triggerInfo))
-			WeaponSound(MELEE_MISS);
-		else
-			WeaponSound(MELEE_HIT);
-#endif
-
 		shit.tHit			= traceHit;
 		shit.aHitAct		= nHitActivity;
 		shit.bIsSec			= bIsSecondary ? true : false;
@@ -466,6 +456,18 @@ void CWeaponCrowbar::Hit(trace_t &traceHit, Activity nHitActivity, bool bIsSecon
 			gamestats->Event_WeaponHit(pPlayer, !bIsSecondary, GetClassname(), info);
 		}
 	}
+	//amogus moved it down here to not die
+#ifdef MAPBASE
+	if (traceHit.m_pEnt)
+	{
+		if (traceHit.m_pEnt->IsWorld())
+			WeaponSound(MELEE_HIT_WORLD);
+		else
+			WeaponSound(MELEE_HIT);
+	}
+	else
+		WeaponSound(MELEE_MISS);
+#endif
 
 	// Apply an impact effect
 	ImpactEffect(traceHit);
