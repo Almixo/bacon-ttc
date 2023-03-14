@@ -67,7 +67,6 @@ public:
 		trace_t		tHit;
 		Activity	aHitAct;
 		bool		bIsSec;
-		
 	};
 
 	something shit;

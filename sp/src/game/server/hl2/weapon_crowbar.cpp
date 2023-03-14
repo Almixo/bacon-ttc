@@ -103,7 +103,7 @@ void CWeaponCrowbar::AddViewKick( void )
 {
 	CBasePlayer *pPlayer  = ToBasePlayer( GetOwner() );
 	
-	if ( pPlayer == NULL )
+	if ( !pPlayer )
 		return;
 
 	QAngle punchAng;
@@ -378,16 +378,6 @@ void CWeaponCrowbar::Swing(int bIsSecondary)
 	}
 	else
 	{
-#ifdef MAPBASE
-		// Other melee sounds
-		if (traceHit.m_pEnt && traceHit.m_pEnt->IsWorld())
-			WeaponSound(MELEE_HIT_WORLD);
-		else if (traceHit.m_pEnt && !traceHit.m_pEnt->PassesDamageFilter(triggerInfo))
-			WeaponSound(MELEE_MISS);
-		else
-			WeaponSound(MELEE_HIT);
-#endif
-
 		shit.tHit			= traceHit;
 		shit.aHitAct		= nHitActivity;
 		shit.bIsSec			= bIsSecondary ? true : false;
@@ -415,7 +405,7 @@ void CWeaponCrowbar::Swing(int bIsSecondary)
 //------------------------------------------------------------------------------
 // Purpose: Implement impact function
 //------------------------------------------------------------------------------
-void CWeaponCrowbar::Hit(trace_t& traceHit, Activity nHitActivity, bool bIsSecondary)
+void CWeaponCrowbar::Hit(trace_t &traceHit, Activity nHitActivity, bool bIsSecondary)
 {
 	CBasePlayer *pPlayer = ToBasePlayer(GetOwner());
 	if (!pPlayer)
@@ -430,7 +420,7 @@ void CWeaponCrowbar::Hit(trace_t& traceHit, Activity nHitActivity, bool bIsSecon
 	// This isn't great, but it's something for when the crowbar hits.
 	pPlayer->RumbleEffect(RUMBLE_AR2, 0, RUMBLE_FLAG_RESTART);
 
-	CBaseEntity* pHitEntity = traceHit.m_pEnt;
+	CBaseEntity *pHitEntity = traceHit.m_pEnt;
 
 	//Apply damage to a hit target
 	if (pHitEntity != NULL)
@@ -466,6 +456,18 @@ void CWeaponCrowbar::Hit(trace_t& traceHit, Activity nHitActivity, bool bIsSecon
 			gamestats->Event_WeaponHit(pPlayer, !bIsSecondary, GetClassname(), info);
 		}
 	}
+	//amogus moved it down here to not die
+#ifdef MAPBASE
+	if (traceHit.m_pEnt)
+	{
+		if (traceHit.m_pEnt->IsWorld())
+			WeaponSound(MELEE_HIT_WORLD);
+		else
+			WeaponSound(MELEE_HIT);
+	}
+	else
+		WeaponSound(MELEE_MISS);
+#endif
 
 	// Apply an impact effect
 	ImpactEffect(traceHit);
