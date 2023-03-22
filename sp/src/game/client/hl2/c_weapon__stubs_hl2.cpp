@@ -26,6 +26,7 @@ STUB_WEAPON_CLASS( weapon_citizensuitcase, WeaponCitizenSuitcase, C_WeaponCitize
 
 #ifdef MAPBASE
 STUB_WEAPON_CLASS( weapon_displacer, Displacer, C_BaseHLCombatWeapon );
+STUB_WEAPON_CLASS( weapon_wrench, WeaponWrench, C_BaseHLBludgeonWeapon );
 #endif
 
 #ifndef HL2MP
