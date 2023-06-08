@@ -1289,33 +1289,45 @@ void C_BasePlayer::TeamChange( int iNewTeam )
 //-----------------------------------------------------------------------------
 // Purpose: Creates, destroys, and updates the flashlight effect as needed.
 //-----------------------------------------------------------------------------
-void C_BasePlayer::UpdateFlashlight()
+void C_BasePlayer::UpdateFlashlight( )
 {
 	// The dim light is the flashlight.
+	//if ( IsEffectActive( EF_DIMLIGHT ) )
+	//{
+	//	if (!m_pFlashlight)
+	//	{
+	//		//Turned on the headlight; create it.
+	//		m_pFlashlight = new CFlashlightEffect(index);
+
+	//		if (!m_pFlashlight)
+	//			return;
+
+	//		m_pFlashlight->TurnOn();
+	//	}
+
+	//	Vector vecForward, vecRight, vecUp;
+	//	EyeVectors( &vecForward, &vecRight, &vecUp );
+
+	//	//Update the light with the new position and direction.		
+	//	m_pFlashlight->UpdateLight( EyePosition(), vecForward, vecRight, vecUp, FLASHLIGHT_DISTANCE );
+	//}
+	//else if (m_pFlashlight)
+	//{
+	//	//Turned off the flashlight; delete it.
+	//	delete m_pFlashlight;
+	//	m_pFlashlight = NULL;
+	//}
+
+	//do nothing, we don't want to cast any flashlight effect
+	//very hacky and dumb but whatever
+
 	if ( IsEffectActive( EF_DIMLIGHT ) )
 	{
-		if (!m_pFlashlight)
-		{
-			// Turned on the headlight; create it.
-			m_pFlashlight = new CFlashlightEffect(index);
-
-			if (!m_pFlashlight)
-				return;
-
-			m_pFlashlight->TurnOn();
-		}
-
-		Vector vecForward, vecRight, vecUp;
-		EyeVectors( &vecForward, &vecRight, &vecUp );
-
-		// Update the light with the new position and direction.		
-		m_pFlashlight->UpdateLight( EyePosition(), vecForward, vecRight, vecUp, FLASHLIGHT_DISTANCE );
+		view->SetScreenOverlayMaterial( materials->FindMaterial( "effects/nightvisioneffect001", TEXTURE_GROUP_CLIENT_EFFECTS, true ) );
 	}
-	else if (m_pFlashlight)
+	else
 	{
-		// Turned off the flashlight; delete it.
-		delete m_pFlashlight;
-		m_pFlashlight = NULL;
+		view->SetScreenOverlayMaterial( NULL );
 	}
 }
 

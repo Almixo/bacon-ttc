@@ -24,12 +24,6 @@ ConVar sk_weapon_dp_alt_fire_radius("sk_weapon_dp_alt_fire_radius", "10");
 ConVar sk_weapon_dp_alt_fire_duration("sk_weapon_dp_alt_fire_duration", "2");
 ConVar sk_weapon_dp_alt_fire_mass("sk_weapon_dp_alt_fire_mass", "150");
 
-enum
-{
-	PRIMARY = 1,
-	SECONDARY,
-};
-
 class CDisplacer : public CBaseHLCombatWeapon
 {
 	DECLARE_CLASS( CDisplacer, CBaseHLCombatWeapon );
@@ -54,6 +48,12 @@ private:
 	bool	bInThink		= false;	//are we charging?
 	float	fNextThink		= 0;		//when's it gonna get charged?
 	int		iModeSwitch		= 0;		//1 for primary, 2 for secondary
+
+	enum
+	{
+		PRIMARY = 1,
+		SECONDARY,
+	};
 };
 
 IMPLEMENT_SERVERCLASS_ST( CDisplacer, DT_Displacer )

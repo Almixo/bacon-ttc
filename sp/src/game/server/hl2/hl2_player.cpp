@@ -128,6 +128,7 @@ ConVar hl2_use_sp_animstate( "hl2_use_sp_animstate", "1", FCVAR_NONE, "Allows SP
 #define	FLASH_DRAIN_TIME	 1.1111	// 100 units / 90 secs
 #define	FLASH_CHARGE_TIME	 50.0f	// 100 units / 2 secs
 
+ConVar nightvision_file( "nightvision_file", "materials/nightvision.raw", FCVAR_USERINFO | FCVAR_ARCHIVE );
 
 //==============================================================================================
 // CAPPED PLAYER PHYSICS DAMAGE TABLE
@@ -605,6 +606,8 @@ BEGIN_DATADESC( CHL2_Player )
 
 	DEFINE_FIELD( m_flTimeNextLadderHint, FIELD_TIME ),
 
+	DEFINE_FIELD( pColorCorrection, FIELD_CLASSPTR ),
+
 	//DEFINE_FIELD( m_hPlayerProxy, FIELD_EHANDLE ), //Shut up class check!
 
 END_DATADESC()
@@ -638,6 +641,8 @@ CHL2_Player::CHL2_Player()
 
 	m_flArmorReductionTime = 0.0f;
 	m_iArmorReductionFrom = 0;
+
+	pColorCorrection = NULL;
 }
 
 //
@@ -1543,6 +1548,14 @@ void CHL2_Player::Spawn(void)
 	GetPlayerProxy();
 
 	SetFlashlightPowerDrainScale( 1.0f );
+
+	pColorCorrection = CREATE_ENTITY(CColorCorrection, "color_correction");
+	pColorCorrection->KeyValue("filename", nightvision_file.GetString());
+	pColorCorrection->KeyValue("maxfalloff", "-1");
+	pColorCorrection->KeyValue("StartDisabled", "1");
+
+	DispatchSpawn(pColorCorrection);
+	pColorCorrection->Activate(); //TODO: unneeded?
 }
 
 //-----------------------------------------------------------------------------
@@ -1794,6 +1807,8 @@ CHL2_Player::~CHL2_Player( void )
 		m_pPlayerAnimState = NULL;
 	}
 #endif
+	pColorCorrection->Remove( );
+	pColorCorrection = NULL;
 }
 
 //-----------------------------------------------------------------------------
@@ -2603,6 +2618,15 @@ void CHL2_Player::FlashlightTurnOn( void )
 	variant_t flashlighton;
 	flashlighton.SetFloat( m_HL2Local.m_flSuitPower / 100.0f );
 	FirePlayerProxyOutput( "OnFlashlightOn", flashlighton, this, this );
+
+	if ( !pColorCorrection )
+	{
+		Warning( "No color correction entity in FlashlightTurnOn()!\n" );
+		return;
+	}
+
+	inputdata_t info;
+	pColorCorrection->InputEnable(info);
 }
 
 
@@ -2622,6 +2646,15 @@ void CHL2_Player::FlashlightTurnOff( void )
 	variant_t flashlightoff;
 	flashlightoff.SetFloat( m_HL2Local.m_flSuitPower / 100.0f );
 	FirePlayerProxyOutput( "OnFlashlightOff", flashlightoff, this, this );
+
+	if ( !pColorCorrection )
+	{
+		Warning( "No color correction entity in FlashlightTurnOff()!\n" );
+		return;
+	}
+
+	inputdata_t info;
+	pColorCorrection->InputDisable(info);
 }
 
 //-----------------------------------------------------------------------------

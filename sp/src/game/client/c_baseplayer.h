@@ -558,7 +558,9 @@ private:
 
 
 	// Player flashlight dynamic light pointers
-	CFlashlightEffect *m_pFlashlight;
+	//CFlashlightEffect *m_pFlashlight;
+	//CColorCorrectionMgr *m_pFlashlight;
+	C_ColorCorrection* m_pFlashlight;
 
 	typedef CHandle<C_BaseCombatWeapon> CBaseCombatWeaponHandle;
 	CNetworkVar( CBaseCombatWeaponHandle, m_hLastWeapon );
