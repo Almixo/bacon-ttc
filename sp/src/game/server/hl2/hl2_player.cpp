@@ -2621,7 +2621,7 @@ void CHL2_Player::FlashlightTurnOn( void )
 
 	if ( !pColorCorrection )
 	{
-		Warning( "No color correction entity in FlashlightTurnOn()!\n" );
+		DevWarning( "No color correction entity in FlashlightTurnOn()!\n" );
 		return;
 	}
 
@@ -2649,7 +2649,7 @@ void CHL2_Player::FlashlightTurnOff( void )
 
 	if ( !pColorCorrection )
 	{
-		Warning( "No color correction entity in FlashlightTurnOff()!\n" );
+		DevWarning( "No color correction entity in FlashlightTurnOff()!\n" );
 		return;
 	}
 

@@ -1151,6 +1151,11 @@ extern int GetPistolActtableCount();
 
 extern acttable_t *Get357Acttable();
 extern int Get357ActtableCount();
+
+	#ifdef MAPBASE
+	extern acttable_t *GetDeagleActtable( );
+	extern int GetDeagleActtableCount( );
+	#endif
 #endif
 
 //-----------------------------------------------------------------------------
