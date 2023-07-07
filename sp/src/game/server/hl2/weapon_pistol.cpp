@@ -28,6 +28,8 @@
 #define	PISTOL_ACCURACY_MAXIMUM_PENALTY_TIME	1.5f	// Maximum penalty to deal out
 
 ConVar	pistol_use_new_accuracy( "pistol_use_new_accuracy", "1" );
+static ConVar pistol_shove_force( "pistol_shove_force", "350", FCVAR_USERINFO | FCVAR_ARCHIVE, "Pistol shove modifier." );
+static ConVar pistol_shove_range( "pistol_shove_range", "74", FCVAR_USERINFO | FCVAR_ARCHIVE, "Pistol shove range." );
 
 //-----------------------------------------------------------------------------
 // CWeaponPistol
@@ -49,6 +51,7 @@ public:
 	void	ItemPreFrame( void );
 	void	ItemBusyFrame( void );
 	void	PrimaryAttack( void );
+	void	SecondaryAttack( void );
 	void	AddViewKick( void );
 	void	DryFire( void );
 	void	Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
@@ -391,6 +394,7 @@ void CWeaponPistol::DryFire( void )
 	
 	m_flSoonestPrimaryAttack	= gpGlobals->curtime + PISTOL_FASTEST_DRY_REFIRE_TIME;
 	m_flNextPrimaryAttack		= gpGlobals->curtime + SequenceDuration();
+	m_flNextSecondaryAttack		= gpGlobals->curtime + SequenceDuration();
 }
 
 //-----------------------------------------------------------------------------
@@ -408,6 +412,7 @@ void CWeaponPistol::PrimaryAttack( void )
 	}
 
 	m_flLastAttackTime = gpGlobals->curtime;
+	m_flNextSecondaryAttack = gpGlobals->curtime + .75;
 	m_flSoonestPrimaryAttack = gpGlobals->curtime + PISTOL_FASTEST_REFIRE_TIME;
 	CSoundEnt::InsertSound( SOUND_COMBAT, GetAbsOrigin(), SOUNDENT_VOLUME_PISTOL, 0.2, GetOwner() );
 
@@ -429,6 +434,44 @@ void CWeaponPistol::PrimaryAttack( void )
 
 	m_iPrimaryAttacks++;
 	gamestats->Event_WeaponFired( pOwner, true, GetClassname() );
+}
+
+void CWeaponPistol::SecondaryAttack( void )
+{
+	CBasePlayer *pPlayer = ToBasePlayer( GetOwner( ) );
+	if ( pPlayer == NULL )
+		return;
+
+	trace_t tr;
+	Vector vecStart, vecDir, vecEnd;
+
+	vecStart = pPlayer->Weapon_ShootPosition( );
+	AngleVectors( EyeAngles( ), &vecDir );
+	vecEnd = vecStart + vecDir * pistol_shove_range.GetInt( );
+
+	UTIL_TraceLine( vecStart, vecEnd, MASK_SOLID, pPlayer, COLLISION_GROUP_NONE, &tr );
+	if ( tr.DidHit( ) )
+	{
+		CBaseEntity *pEnt = tr.m_pEnt;
+
+		if ( pEnt != NULL)
+		{
+			if ( pEnt->IsNPC( ) )
+			{
+				EmitSound( "MetalVent.ImpactHard" );
+				return; //return for now!
+			}
+
+			Vector vecForce = vecDir.Normalized( ) * pistol_shove_force.GetInt( );
+			pEnt->ApplyAbsVelocityImpulse( vecForce );
+
+			DevWarning( "applied velocity!\n" );
+		}
+	}
+
+	//EmitSound( "Default.BulletImpact" ); //so we know we are doing something
+
+	pPlayer->SetNextAttack( gpGlobals->curtime + .75f );
 }
 
 //-----------------------------------------------------------------------------

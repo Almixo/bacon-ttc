@@ -6248,7 +6248,6 @@ void CBasePlayer::ImpulseCommands( )
 		{
 			FlashlightTurnOn();
 		}
-		UTIL_ScreenFade(this, { 0, 0, 0, 255 }, 0.2, 0.1, (FFADE_OUT));
 		break;
 
 	case 200:
@@ -6544,6 +6543,10 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 		GiveNamedItem( "weapon_crossbow" );
 #ifdef HL2_EPISODIC
 		// GiveNamedItem( "weapon_magnade" );
+#endif
+#ifdef MAPBASE
+		GiveNamedItem( "weapon_wrench" );
+		GiveNamedItem( "weapon_deagle" );
 #endif
 		if ( GetHealth() < 100 )
 		{
@@ -7263,15 +7266,6 @@ void CBasePlayer::UpdateClientData( void )
 		UserMessageBegin( user, "GameTitle" );
 		MessageEnd();
 		world->SetDisplayTitle( false );
-	}
-
-	UserMessageBegin(user, "NightVision");
-	WRITE_SHORT(FlashlightIsOn());
-	MessageEnd();
-	
-	if (FlashlightIsOn())
-	{
-		UTIL_ScreenFade(this, { 0, 255, 0, 60 }, 0.1, 0.01, (FFADE_IN));
 	}
 
 	if (m_ArmorValue != m_iClientBattery)

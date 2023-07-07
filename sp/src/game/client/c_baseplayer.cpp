@@ -1310,12 +1310,19 @@ void C_BasePlayer::UpdateFlashlight()
 
 		// Update the light with the new position and direction.		
 		m_pFlashlight->UpdateLight( EyePosition(), vecForward, vecRight, vecUp, FLASHLIGHT_DISTANCE );
+
+		//Set our screen overlay!
+		//TODO: maybe a better texture?
+		view->SetScreenOverlayMaterial( materials->FindMaterial( "effects/nightvisioneffect001", TEXTURE_GROUP_CLIENT_EFFECTS, true ) );
 	}
 	else if (m_pFlashlight)
 	{
 		// Turned off the flashlight; delete it.
 		delete m_pFlashlight;
 		m_pFlashlight = NULL;
+
+		//We don't want no screen overlay!
+		view->SetScreenOverlayMaterial( NULL );
 	}
 }
 

@@ -8,7 +8,6 @@
 #define WEAPON_CROWBAR_H
 
 #include "basebludgeonweapon.h"
-#include "rumble_shared.h"
 
 #if defined( _WIN32 )
 #pragma once
@@ -19,9 +18,7 @@
 #endif
 
 #define	CROWBAR_RANGE	75.0f
-#define	CROWBAR_REFIRE	0.75f //0.4f default
-#define WRENCH_RANGE_PRIMARY 90.0f
-#define WRENCH_RANGE_SECONDARY 120.0f
+#define	CROWBAR_REFIRE	0.4f
 
 //-----------------------------------------------------------------------------
 // CWeaponCrowbar
@@ -30,46 +27,24 @@
 class CWeaponCrowbar : public CBaseHLBludgeonWeapon
 {
 public:
-	DECLARE_CLASS( CWeaponCrowbar, CBaseHLBludgeonWeapon );
+	DECLARE_CLASS(CWeaponCrowbar, CBaseHLBludgeonWeapon);
 
 	DECLARE_SERVERCLASS();
 	DECLARE_ACTTABLE();
 
 	CWeaponCrowbar();
 
-	float		GetRange( void )		{	return	CROWBAR_RANGE;	}
-	float		GetFireRate( void )		{	return	CROWBAR_REFIRE;	}
+	float		GetRange(void) { return	CROWBAR_RANGE; }
+	float		GetFireRate(void) { return	CROWBAR_REFIRE; }
 
-	void		AddViewKick( void );
-	float		GetDamageForActivity( Activity hitActivity );
+	void		AddViewKick(void);
+	float		GetDamageForActivity(Activity hitActivity);
 
-	virtual int WeaponMeleeAttack1Condition( float flDot, float flDist );
-	void		SecondaryAttack(void);
-	void		PrimaryAttack(void);
-	void		ItemPostFrame(void);
-	void		Swing(int bIsSecondary);
-	void		Hit(trace_t& traceHit, Activity nHitActivity, bool bIsSecondary);
+	virtual int WeaponMeleeAttack1Condition(float flDot, float flDist);
+	void		SecondaryAttack(void) { return; }
 
 	// Animation event
-	virtual void Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
-
-	int			m_iCrowbarStage;
-	float		m_flStageUpdate;
-	bool		m_bIsHoldingSecondary;
-	float		m_flHoldUpdate;
-	float		m_flHoldMultiplier;
-	float		m_flHoldRange;
-
-	float		m_bIsAttacking = false;
-	float		m_flDelayedAttack = 0;
-
-	struct something {
-		trace_t		tHit;
-		Activity	aHitAct;
-		bool		bIsSec;
-	};
-
-	something shit;
+	virtual void Operator_HandleAnimEvent(animevent_t *pEvent, CBaseCombatCharacter *pOperator);
 
 #ifdef MAPBASE
 	// Don't use backup activities
@@ -79,7 +54,7 @@ public:
 
 private:
 	// Animation event handlers
-	void HandleAnimEventMeleeHit( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
+	void HandleAnimEventMeleeHit(animevent_t *pEvent, CBaseCombatCharacter *pOperator);
 };
 
 #endif // WEAPON_CROWBAR_H
