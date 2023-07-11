@@ -454,22 +454,19 @@ void CWeaponPistol::SecondaryAttack( void )
 	{
 		CBaseEntity *pEnt = tr.m_pEnt;
 
-		if ( pEnt != NULL)
+		if ( pEnt != NULL && !pEnt->IsWorld( ) )
 		{
 			if ( pEnt->IsNPC( ) )
 			{
-				EmitSound( "MetalVent.ImpactHard" );
+				DevWarning( "Hit an entity, not yet implemented.\n" ); // no sound because kaklo
 				return; //return for now!
 			}
 
-			Vector vecForce = vecDir.Normalized( ) * pistol_shove_force.GetInt( );
-			pEnt->ApplyAbsVelocityImpulse( vecForce );
+			pEnt->ApplyAbsVelocityImpulse( vecDir.Normalized( ) * pistol_shove_force.GetFloat( ) );
 
 			DevWarning( "applied velocity!\n" );
 		}
 	}
-
-	//EmitSound( "Default.BulletImpact" ); //so we know we are doing something
 
 	pPlayer->SetNextAttack( gpGlobals->curtime + .75f );
 }
