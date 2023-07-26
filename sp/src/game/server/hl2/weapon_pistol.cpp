@@ -456,15 +456,16 @@ void CWeaponPistol::SecondaryAttack( void )
 
 		if ( pEnt != NULL && !pEnt->IsWorld( ) )
 		{
-			if ( pEnt->IsNPC( ) )
-			{
-				DevWarning( "Hit an entity, not yet implemented.\n" ); // no sound because kaklo
-				return; //return for now!
-			}
+			//if ( pEnt->IsNPC( ) )
+			//{
+			//	DevWarning( "Hit an entity, not yet implemented.\n" ); // no sound because kaklo
+			//	return; //return for now!
+			//}
 
 			pEnt->ApplyAbsVelocityImpulse( vecDir.Normalized( ) * pistol_shove_force.GetFloat( ) );
 
-			DevWarning( "applied velocity!\n" );
+			if (pEnt->GetHealth() > 0)
+				pEnt->TakeDamage(CTakeDamageInfo(this, this, (pistol_shove_force.GetFloat() + pEnt->GetHealth()) / 3, DMG_CLUB));
 		}
 	}
 
