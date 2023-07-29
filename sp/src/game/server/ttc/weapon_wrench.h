@@ -19,7 +19,7 @@
 #endif
 
 #define	WRENCH_RANGE	75.0f
-#define	WRENCH_REFIRE	0.75f //0.4f default
+#define	WRENCH_REFIRE	1.0f //0.75f
 #define WRENCH_RANGE_PRIMARY 90.0f
 #define WRENCH_RANGE_SECONDARY 120.0f
 

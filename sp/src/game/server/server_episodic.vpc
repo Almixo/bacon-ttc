@@ -298,16 +298,6 @@ $Project "Server (Episodic)"
 				$File	"hl2\weapon_flaregun.cpp"
 				$File	"hl2\weapon_flaregun.h"
 			}
-			
-			$Folder "TTC"
-			{
-				$File	"ttc\weapon_deagle.cpp"
-				$File	"ttc\info_point_displace.cpp"
-				$File	"ttc\weapon_displace.cpp"
-				$File	"ttc\weapon_wrench.cpp"
-				$File	"ttc\weapon_wrench.h"
-				$File	"ttc\xen_tree.cpp"
-			}
 		}
 		
 		$Folder "TTC"
@@ -317,6 +307,7 @@ $Project "Server (Episodic)"
 			$File	"ttc\weapon_displacer.cpp"
 			$File	"ttc\weapon_wrench.cpp"
 			$File	"ttc\weapon_wrench.h"
+			$File	"ttc\button_wrench.cpp"
 			$File	"ttc\xen_tree.cpp"
 		}
 	}

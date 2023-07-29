@@ -2696,6 +2696,10 @@ typedef enum
 	ACT_HL2MP_JUMP_USE_HEAVY,
 #endif
 
+#ifdef MAPBASE
+	ACT_VM_WRENCH_TINKER,
+#endif
+
 	// this is the end of the global activities, private per-monster activities start here.
 	LAST_SHARED_ACTIVITY,
 } Activity;
