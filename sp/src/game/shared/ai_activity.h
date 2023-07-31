@@ -2698,6 +2698,8 @@ typedef enum
 
 #ifdef MAPBASE
 	ACT_VM_WRENCH_TINKER,
+	ACT_VM_PISTOL_SHOVE_MISS,
+	ACT_VM_PISTOL_SHOVE_HIT,
 #endif
 
 	// this is the end of the global activities, private per-monster activities start here.

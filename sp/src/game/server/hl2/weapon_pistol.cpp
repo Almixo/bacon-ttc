@@ -450,24 +450,23 @@ void CWeaponPistol::SecondaryAttack( void )
 	vecEnd = vecStart + vecDir * pistol_shove_range.GetInt( );
 
 	UTIL_TraceLine( vecStart, vecEnd, MASK_SOLID, pPlayer, COLLISION_GROUP_NONE, &tr );
+
 	if ( tr.DidHit( ) )
 	{
+		SendWeaponAnim( ACT_VM_PISTOL_SHOVE_HIT );
+
 		CBaseEntity *pEnt = tr.m_pEnt;
 
 		if ( pEnt != NULL && !pEnt->IsWorld( ) )
 		{
-			//if ( pEnt->IsNPC( ) )
-			//{
-			//	DevWarning( "Hit an entity, not yet implemented.\n" ); // no sound because kaklo
-			//	return; //return for now!
-			//}
-
 			pEnt->ApplyAbsVelocityImpulse( vecDir.Normalized( ) * pistol_shove_force.GetFloat( ) );
 
 			if (pEnt->GetHealth() > 0)
-				pEnt->TakeDamage(CTakeDamageInfo(this, this, (pistol_shove_force.GetFloat() + pEnt->GetHealth()) / 3, DMG_CLUB));
+				pEnt->TakeDamage(CTakeDamageInfo(this, this, (pistol_shove_force.GetFloat() + pEnt->GetHealth()) / 3, DMG_CLUB)); //TODO: rework this!
 		}
 	}
+	else
+		SendWeaponAnim( ACT_VM_PISTOL_SHOVE_MISS );
 
 	pPlayer->SetNextAttack( gpGlobals->curtime + .75f );
 }
