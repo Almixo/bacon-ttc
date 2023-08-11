@@ -29,8 +29,8 @@
 //-----------------------------------------------------------------------------
 
 #ifdef MAPBASE
-extern acttable_t *GetPistolActtable( );
-extern int GetPistolActtableCount( );
+extern acttable_t *GetDeagleActtable( );
+extern int GetDeagleActtableCount( );
 #endif
 
 const char* g_pDeLaserDotThink = "DeLaserThinkContext";
@@ -151,8 +151,8 @@ public:
 	void	FireNPCPrimaryAttack( CBaseCombatCharacter *pOperator, Vector &vecShootOrigin, Vector &vecShootDir );
 	void	Operator_ForceNPCFire( CBaseCombatCharacter  *pOperator, bool bSecondary );
 
-	virtual acttable_t		*GetBackupActivityList( ) { return GetPistolActtable( ); }
-	virtual int				GetBackupActivityListCount( ) { return GetPistolActtableCount( ); }
+	virtual acttable_t		*GetBackupActivityList( ) { return GetDeagleActtable( ); }
+	virtual int				GetBackupActivityListCount( ) { return GetDeagleActtableCount( ); }
 #endif
 
 	DECLARE_SERVERCLASS( );
