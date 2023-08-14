@@ -30,7 +30,7 @@
 ConVar	pistol_use_new_accuracy( "pistol_use_new_accuracy", "1" );
 static ConVar pistol_shove_force( "pistol_shove_force", "350", FCVAR_USERINFO | FCVAR_ARCHIVE, "Pistol shove modifier." );
 static ConVar pistol_shove_range( "pistol_shove_range", "74", FCVAR_USERINFO | FCVAR_ARCHIVE, "Pistol shove range." );
-
+static ConVar sk_plr_dmg_pistol_shove("sk_plr_dmg_pistol_shove", "0");
 //-----------------------------------------------------------------------------
 // CWeaponPistol
 //-----------------------------------------------------------------------------
@@ -462,7 +462,7 @@ void CWeaponPistol::SecondaryAttack( void )
 			pEnt->ApplyAbsVelocityImpulse( vecDir.Normalized( ) * pistol_shove_force.GetFloat( ) );
 
 			if (pEnt->GetHealth() > 0)
-				pEnt->TakeDamage(CTakeDamageInfo(this, this, (pistol_shove_force.GetFloat() + pEnt->GetHealth()) / 3, DMG_CLUB)); //TODO: rework this!
+				pEnt->TakeDamage(CTakeDamageInfo(this, this, min(pEnt->GetHealth() / 6, sk_plr_dmg_pistol_shove.GetInt()), DMG_CLUB)); //TODO: rework this!
 		}
 	}
 	else
