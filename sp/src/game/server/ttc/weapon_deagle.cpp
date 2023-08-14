@@ -817,7 +817,7 @@ void CWeaponDeagle::StartLaserEffects( void )
 
 	if ( m_hLaserBeam == NULL )
 	{
-		m_hLaserBeam = CBeam::BeamCreate( RPG_BEAM_SPRITE, 1.0f );
+
 
 		if ( m_hLaserBeam == NULL )
 		{
