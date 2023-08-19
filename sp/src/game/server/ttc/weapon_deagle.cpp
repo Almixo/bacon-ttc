@@ -7,31 +7,16 @@
 
 #include "cbase.h"
 #include "npcevent.h"
-#include "gamestats.h"
-#include "beam_shared.h"
-#ifndef CLIENT_DLL
 #include "basehlcombatweapon.h"
 #include "ai_basenpc.h"
 #include "soundent.h"
 #include "te_effect_dispatch.h"
-#else
-#include "c_basehlcombatweapon.h"
-#include "iviewrender_beams.h"
+#include "gamestats.h"
 #include "beam_shared.h"
-#include "materialsystem/imaterial.h"
-#include "model_types.h"
-#include "c_te_effect_dispatch.h"
-#include "fx_quad.h"
-#include "fx.h"
-#include "beamdraw.h"
-#endif
+#include "ttc/CDot.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
-
-#ifdef CLIENT_DLL
-#define CWeaponDeagle C_WeaponDeagle
-#endif
 
 //-----------------------------------------------------------------------------
 // CWeaponDeagle
@@ -47,8 +32,6 @@ extern int GetDeagleActtableCount( );
 class CWeaponDeagle : public CBaseHLCombatWeapon
 {
 	DECLARE_CLASS( CWeaponDeagle, CBaseHLCombatWeapon );
-	DECLARE_NETWORKCLASS();
-	DECLARE_DATADESC();
 public:
 
 	CWeaponDeagle( void );
@@ -58,6 +41,7 @@ public:
 	void	PrimaryAttack( void );
 	void	SecondaryAttack( void );
 	void	WeaponIdle( void );
+	void	ItemPostFrame( void );
 
 	void	Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCharacter *pOperator );
 	float	WeaponAutoAimScale( ) { return 0.6f; }
@@ -70,7 +54,7 @@ public:
 	bool	IsGuiding( void ) { return m_bGuiding; };
 	void	ToggleGuiding( void ) { IsGuiding() ? StopGuiding() : StartGuiding(); };
 
-#if defined MAPBASE && GAME_DLL
+#ifdef MAPBASE
 	int		CapabilitiesGet( void ) { return bits_CAP_WEAPON_RANGE_ATTACK1; }
 
 	virtual int	GetMinBurst( ) { return 1; }
@@ -104,42 +88,31 @@ public:
 	virtual acttable_t		*GetBackupActivityList( ) { return GetDeagleActtable( ); }
 	virtual int				GetBackupActivityListCount( ) { return GetDeagleActtableCount( ); }
 #endif
-#if defined MAPBASE && GAME_DLL
+
+	DECLARE_SERVERCLASS( );
+	DECLARE_DATADESC( );
+#ifdef MAPBASE
 	DECLARE_ACTTABLE( );
 #endif
-
-#ifdef CLIENT_DLL
-	virtual int				DrawModel(int flags);
-	virtual void			ClientThink(void);
-	virtual void			OnDataChanged(DataUpdateType_t updateType);
-	virtual RenderGroup_t	GetRenderGroup(void);
-#endif
 private:
-	CNetworkVar( bool, m_bGuiding );
-
+	bool m_bGuiding;
 	bool m_bWasGuiding;
 
 	CBeam *pBeam;
+	CGuidedDot *pDot;
 };
 
 LINK_ENTITY_TO_CLASS( weapon_deagle, CWeaponDeagle );
 
 PRECACHE_WEAPON_REGISTER( weapon_deagle );
 
-IMPLEMENT_NETWORKCLASS_ALIASED(WeaponDeagle, DT_WeaponDeagle)
-
-BEGIN_NETWORK_TABLE(CWeaponDeagle, DT_WeaponDeagle)
-#ifndef CLIENT_DLL
-SendPropBool(SENDINFO(m_bGuiding)),
-#else
-RecvPropBool(RECVINFO(m_bGuiding)),
-#endif
-END_NETWORK_TABLE();
+IMPLEMENT_SERVERCLASS_ST( CWeaponDeagle, DT_WeaponDeagle )
+END_SEND_TABLE( )
 
 BEGIN_DATADESC( CWeaponDeagle )
 END_DATADESC( )
 
-#if defined  MAPBASE && GAME_DLL
+#ifdef MAPBASE
 acttable_t	CWeaponDeagle::m_acttable[ ] =
 {
 #if EXPANDED_HL2_WEAPON_ACTIVITIES
@@ -266,6 +239,7 @@ acttable_t	CWeaponDeagle::m_acttable[ ] =
 #endif
 };
 
+
 IMPLEMENT_ACTTABLE( CWeaponDeagle );
 
 // Allows Weapon_BackupActivity() to access the 357's activity table.
@@ -279,6 +253,7 @@ int GetDeagleActtableCount( )
 	return ARRAYSIZE( CWeaponDeagle::m_acttable );
 }
 #endif
+
 //-----------------------------------------------------------------------------
 // Purpose: Constructor
 //-----------------------------------------------------------------------------
@@ -313,7 +288,6 @@ CWeaponDeagle::~CWeaponDeagle( void )
 	}
 }
 
-#ifndef CLIENT_DLL
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
@@ -359,9 +333,8 @@ void CWeaponDeagle::Operator_HandleAnimEvent( animevent_t *pEvent, CBaseCombatCh
 #endif
 	}
 }
-#endif
 
-#if defined MAPBASE && GAME_DLL
+#ifdef MAPBASE
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
@@ -390,12 +363,12 @@ void CWeaponDeagle::Operator_ForceNPCFire( CBaseCombatCharacter *pOperator, bool
 	FireNPCPrimaryAttack( pOperator, vecShootOrigin, vecShootDir );
 }
 #endif
+
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
 void CWeaponDeagle::PrimaryAttack( void )
 {
-#ifndef CLIENT_DLL
 	// Only the player fires this way so we can cast
 	CBasePlayer *pPlayer = ToBasePlayer( GetOwner( ) );
 
@@ -471,7 +444,6 @@ void CWeaponDeagle::PrimaryAttack( void )
 		// HEV suit - indicate out of ammo condition
 		pPlayer->SetSuitUpdate( "!HEV_AMO0", FALSE, 0 );
 	}
-#endif
 }
 
 void CWeaponDeagle::SecondaryAttack( void )
@@ -482,36 +454,62 @@ void CWeaponDeagle::SecondaryAttack( void )
 	Warning( "Toggled? %s.\n", m_bGuiding ? "yes" : "no" );
 }
 
-void CWeaponDeagle::WeaponIdle( void )
+void CWeaponDeagle::ItemPostFrame( void )
 {
-	BaseClass::WeaponIdle();
-	
-	StartGuiding();
+	BaseClass::ItemPostFrame();
 
-	if ( m_bWasGuiding )
-		m_bWasGuiding = false;
+	if ( m_bGuiding )
+	{
+		CBasePlayer *pPlayer = ToBasePlayer(GetOwner());
+		QAngle qAng;
+		Vector vOrigin, vDir, vEnd;
+		trace_t tr;
+
+		GetAttachment(LookupAttachment("laser_start"), vOrigin, qAng);
+		AngleVectors(qAng, &vDir);
+
+		UTIL_TraceLine(vOrigin, vOrigin + (vDir * MAX_TRACE_LENGTH), MASK_SHOT, pPlayer, COLLISION_GROUP_NONE, &tr);
+
+		vEnd = tr.endpos + vDir * -4;
+
+		NDebugOverlay::Sphere(vEnd, 4, 255, 0, 0, true, 0.5);
+
+		pDot->SetDotPosition(vEnd, tr.plane.normal);
+	}
 }
 
 bool CWeaponDeagle::Holster( CBaseCombatWeapon *pSwitchingTo )
 {
-	StopGuiding();
-
 	if ( m_bGuiding )
+	{
+		StopGuiding();
 		m_bWasGuiding = true;
-
+	}
 	return BaseClass::Holster( pSwitchingTo );
+}
+
+void CWeaponDeagle::WeaponIdle( void )
+{
+	BaseClass::WeaponIdle();
+
+	if ( !m_bGuiding && m_bWasGuiding )
+	{
+		StartGuiding();
+		m_bWasGuiding = false;
+	}
 }
 
 void CWeaponDeagle::StartGuiding( void )
 {
-	if (!m_bWasGuiding) return;
-
 	m_bGuiding = true;
 
 	CreateLaser();
 
 	if ( pBeam )
-		pBeam->SetBrightness(128);
+		pBeam->SetBrightness(255);
+
+	if ( pDot )
+		pDot->TurnOn();
 
 	DevWarning("Started Guiding.\n");
 
@@ -525,102 +523,55 @@ void CWeaponDeagle::StopGuiding( void )
 	if ( pBeam )
 		pBeam->SetBrightness(0);
 
+	if ( pDot )
+		pDot->TurnOff();
+
 	DevWarning("Ended Guiding.\n");
 
 	WeaponSound( SPECIAL2 );
 }
 
-void CWeaponDeagle::CreateLaser(void)
+void CWeaponDeagle::CreateLaser( void )
 {
 	CBasePlayer *pOwner = ToBasePlayer(GetOwner());
-	if (pOwner == NULL || pBeam != NULL)
+	if (pOwner == NULL)
 		return;
-
-	CBaseViewModel *pBeamEnt = pOwner->GetViewModel();
-
-	pBeam = CBeam::BeamCreate(RPG_BEAM_SPRITE, 1.0f);
 
 	if (pBeam == NULL)
 	{
-		// We were unable to create the beam
-		Assert(0);
-		return;
+		pBeam = CBeam::BeamCreate(RPG_BEAM_SPRITE, 1.0f);
+
+		if (pBeam == NULL)
+		{
+			// We were unable to create the beam
+			Assert(0);
+			return;
+		}
+
+		CBaseViewModel *pBeamEnt = pOwner->GetViewModel();
+
+		pBeam->EntsInit(pBeamEnt, pBeamEnt);
+
+		int	startAttachment = LookupAttachment("laser_start");
+		int endAttachment = LookupAttachment("laser_end");
+
+		pBeam->FollowEntity(pBeamEnt);
+		pBeam->SetStartAttachment(startAttachment);
+		pBeam->SetEndAttachment(endAttachment);
+		pBeam->SetNoise(0);
+		pBeam->SetColor(255, 0, 0);
+		pBeam->SetScrollRate(0);
+		pBeam->SetWidth(0.5f);
+		pBeam->SetEndWidth(0.5f);
+		pBeam->SetBrightness(m_bGuiding ? 255 : 0);
+		pBeam->SetBeamFlags(SF_BEAM_SHADEIN);
 	}
 
-	pBeam->EntsInit(pBeamEnt, pBeamEnt);
-
-	int	startAttachment = LookupAttachment("laser_start");
-	int endAttachment = LookupAttachment("laser_end");
-
-	pBeam->FollowEntity(pBeamEnt);
-	pBeam->SetStartAttachment(startAttachment);
-	pBeam->SetEndAttachment(endAttachment);
-	pBeam->SetNoise(0);
-	pBeam->SetColor(255, 0, 0);
-	pBeam->SetScrollRate(0);
-	pBeam->SetWidth(0.5f);
-	pBeam->SetEndWidth(0.5f);
-	pBeam->SetBrightness(128);
-	pBeam->SetBeamFlags(SF_BEAM_SHADEIN);
-
-	m_bGuiding ? pBeam->TurnOn() : pBeam->TurnOff();
-}
-
-#ifdef CLIENT_DLL
-
-int CWeaponDeagle::DrawModel(int flags)
-{
-	if (ShouldDraw() == false)
-		return 0;
-
-	// Only render these on the transparent pass
-	if (m_bGuiding && flags & STUDIO_TRANSPARENCY)
+	if (pDot == NULL)
 	{
-		Vector	vecOrigin;
-		QAngle	vecAngles;
-		float	color[3];
-		float	scale;
+		pDot = CGuidedDot::Create(vec3_origin, pOwner, m_bGuiding, true);
 
-		CMatRenderContextPtr pRenderContext(materials);
-		IMaterial *pMaterial = materials->FindMaterial("sprites/fire_floor", NULL, false);
-		pRenderContext->Bind(pMaterial);
-
-		color[0] = color[1] = color[2] = 0.1f;
-		scale = 20.0f;
-
-		// Draw an all encompassing glow around the entire head
-		GetAttachment(1, vecOrigin, vecAngles);
-		DrawHalo(pMaterial, vecOrigin, scale, color);
-		return 1;
+		if ( pDot == NULL )
+			assert(0);
 	}
-
-	return BaseClass::DrawModel(flags);
 }
-
-//-----------------------------------------------------------------------------
-// Purpose: Randomly adds extra effects
-//-----------------------------------------------------------------------------
-void CWeaponDeagle::ClientThink(void)
-{
-	BaseClass::ClientThink();
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Starts the client-side version thinking
-//-----------------------------------------------------------------------------
-void CWeaponDeagle::OnDataChanged(DataUpdateType_t updateType)
-{
-	BaseClass::OnDataChanged(updateType);
-	if (updateType == DATA_UPDATE_CREATED)
-		SetNextClientThink(CLIENT_THINK_ALWAYS);
-}
-
-//-----------------------------------------------------------------------------
-// Purpose: Tells us we're always a translucent entity
-//-----------------------------------------------------------------------------
-RenderGroup_t CWeaponDeagle::GetRenderGroup(void)
-{
-	return RENDER_GROUP_TWOPASS;
-}
-
-#endif
